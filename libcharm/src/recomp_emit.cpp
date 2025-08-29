@@ -783,17 +783,17 @@ void Recompiler::emit_arm(std::ostream &os, arm::Instruction &instr,
 
     if (instr.is_imm) {
       os << "0x" << (int)instr.hw_data_trans.offset_imm
-         << MINIFY_COMMENT_COMMA(" /* offset */");
+         << MINIFY_COMMENT(" /* offset */");
     } else {
       os << REGISTER_TABLE[(int)instr.hw_data_trans.rm]
-         << MINIFY_COMMENT_COMMA(" /* rm */");
+         << MINIFY_COMMENT(" /* rm */");
     }
 
     os << std::dec << ")";
     break;
 
   case arm::InstructionGroup::SWI:
-    os << "/* swi */";
+    os << MINIFY_COMMENT("/* swi */");
     break;
 
   case arm::InstructionGroup::INVALID:
