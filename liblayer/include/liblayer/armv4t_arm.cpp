@@ -3,11 +3,6 @@
 #include <cstring>
 #include <stdexcept>
 
-template <uint32_t n, uint32_t w = 1>
-constexpr inline uint32_t get_bits(uint32_t x) {
-  return ((x >> n) & ((1U << w) - 1));
-}
-
 constexpr inline reg_value_t op2_lsl(reg_value_t value, reg_value_t amount) {
   if (!amount)
     return value;
