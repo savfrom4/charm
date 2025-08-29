@@ -609,64 +609,6 @@ void Recompiler::emit_arm(std::ostream &os, arm::Instruction &instr,
        << ")";
     break;
 
-  case arm::InstructionGroup::SINGLE_DATA_SWAP:
-    os << "throw "
-          "std::runtime_error(\"SINGLE_DATA_SWAP instruction at 0x"
-       << std::hex << address << std::dec << "\")";
-    break;
-
-  case arm::InstructionGroup::SINGLE_DATA_TRANSFER:
-    os << (instr.data_trans.load ? "ps.arm_ldr(" : "ps.arm_str(")
-
-       << (instr.data_trans.pre_indx ? "true" : "false")
-       << MINIFY_COMMENT_COMMA(" /* pre_indx */, ")
-
-       << (instr.data_trans.add ? "true" : "false")
-       << MINIFY_COMMENT_COMMA(" /* add */, ")
-
-       << (instr.data_trans.byte ? "true" : "false")
-       << MINIFY_COMMENT_COMMA(" /* byte */, ")
-
-       << (instr.data_trans.write_back ? "true" : "false")
-       << MINIFY_COMMENT_COMMA(" /* write_back */, ")
-
-       << REGISTER_TABLE[(int)instr.data_trans.rn]
-       << MINIFY_COMMENT_COMMA(" /* rn */, ")
-
-       << REGISTER_TABLE[(int)instr.data_trans.rd]
-       << MINIFY_COMMENT_COMMA(" /* rd */, ");
-
-    os << std::hex;
-
-    if (instr.is_imm) {
-      os << "0x" << (int)instr.data_trans.offset_imm
-         << MINIFY_COMMENT(" /* offset */");
-    } else {
-      if (instr.data_trans.offset_reg.is_reg) {
-        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type] << "(ps.r["
-           << REGISTER_TABLE[(int)instr.data_trans.offset_reg.rm] << "]"
-           << MINIFY_COMMENT_COMMA("/* rm */")
-
-           << "(ps.r["
-           << REGISTER_TABLE[(int)instr.data_trans.offset_reg.amount_or_rs]
-           << "]" << MINIFY_COMMENT(" /* rs */") << ")";
-      } else {
-        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type] << "(ps.r["
-
-           << REGISTER_TABLE[(int)instr.data_trans.offset_reg.rm] << "]"
-           << MINIFY_COMMENT_COMMA(" /* rm */,")
-
-           << "0x" << std::hex
-           << (uint32_t)instr.data_trans.offset_reg.amount_or_rs << std::dec
-           << MINIFY_COMMENT(" /* amount */") << ")";
-      }
-    }
-
-    os << std::dec;
-    os << MINIFY_COMMENT(", true /* copy */") << ")";
-
-    break;
-
   case arm::InstructionGroup::BRANCH: {
     uint32_t final_offset = (int64_t)(address + 8) + instr.branch.offset;
     Function *mapped = nullptr;
@@ -727,6 +669,64 @@ void Recompiler::emit_arm(std::ostream &os, arm::Instruction &instr,
     os << "address = " << std::hex << "ps.r["
        << REGISTER_TABLE[(int)instr.branchex.rm] << "]; goto __start__; "
        << MINIFY_COMMENT("/* bx */");
+    break;
+
+  case arm::InstructionGroup::SINGLE_DATA_SWAP:
+    os << "throw "
+          "std::runtime_error(\"SINGLE_DATA_SWAP instruction at 0x"
+       << std::hex << address << std::dec << "\")";
+    break;
+
+  case arm::InstructionGroup::SINGLE_DATA_TRANSFER:
+    os << (instr.data_trans.load ? "ps.arm_ldr(" : "ps.arm_str(")
+
+       << (instr.data_trans.pre_indx ? "true" : "false")
+       << MINIFY_COMMENT_COMMA(" /* pre_indx */, ")
+
+       << (instr.data_trans.add ? "true" : "false")
+       << MINIFY_COMMENT_COMMA(" /* add */, ")
+
+       << (instr.data_trans.byte ? "true" : "false")
+       << MINIFY_COMMENT_COMMA(" /* byte */, ")
+
+       << (instr.data_trans.write_back ? "true" : "false")
+       << MINIFY_COMMENT_COMMA(" /* write_back */, ")
+
+       << REGISTER_TABLE[(int)instr.data_trans.rn]
+       << MINIFY_COMMENT_COMMA(" /* rn */, ")
+
+       << REGISTER_TABLE[(int)instr.data_trans.rd]
+       << MINIFY_COMMENT_COMMA(" /* rd */, ");
+
+    os << std::hex;
+
+    if (instr.is_imm) {
+      os << "0x" << (int)instr.data_trans.offset_imm
+         << MINIFY_COMMENT(" /* offset */");
+    } else {
+      if (instr.data_trans.offset_reg.is_reg) {
+        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type] << "(ps.r["
+           << REGISTER_TABLE[(int)instr.data_trans.offset_reg.rm] << "]"
+           << MINIFY_COMMENT_COMMA(" /* rm */,")
+
+           << "ps.r["
+           << REGISTER_TABLE[(int)instr.data_trans.offset_reg.amount_or_rs]
+           << "]" << MINIFY_COMMENT(" /* rs */") << ")";
+      } else {
+        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type] << "(ps.r["
+
+           << REGISTER_TABLE[(int)instr.data_trans.offset_reg.rm] << "]"
+           << MINIFY_COMMENT_COMMA(" /* rm */,")
+
+           << "0x" << std::hex
+           << (uint32_t)instr.data_trans.offset_reg.amount_or_rs << std::dec
+           << MINIFY_COMMENT(" /* amount */") << ")";
+      }
+    }
+
+    os << std::dec;
+    os << ", true" << MINIFY_COMMENT(" /* copy */") << ")";
+
     break;
 
   case arm::InstructionGroup::BLOCK_DATA_TRANSFER: {
