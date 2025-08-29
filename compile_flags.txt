@@ -1,0 +1,3 @@
+-Iliblayer/include
+-Ilibcharm/include
+-Ilibcharm/external/ELFIO
