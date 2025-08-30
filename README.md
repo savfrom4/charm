@@ -1,6 +1,6 @@
 # ⚠️ WARNING
 
-This project is in active development, as such a lot **WILL** be changed. For further information, see **TODO** and **Known issues**.
+This project is in active development, as such a lot **WILL** change. For further information, see **TODO** and **Known issues**.
 
 # libcharm - arm32 static recompiler
 
