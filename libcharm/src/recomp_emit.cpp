@@ -153,7 +153,7 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
   ofs << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl << std::endl;
 
   for (auto &functions : _funs_exports) {
-    ofs << "void " << symbol_name_map(functions.second.name)
+    ofs << "void internal_" << symbol_name_map(functions.second.name)
         << "(ExecutionState& ps);" << std::endl;
   }
 
@@ -272,8 +272,9 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
       << std::endl;
 
   for (auto &functions : _funs_exports) {
-    ofs << "void " << symbol_name_map(functions.second.name)
-        << "(ExecutionState& ps) {" << std::endl;
+    ofs << "__attribute__((weak)) void internal_"
+        << symbol_name_map(functions.second.name) << "(ExecutionState& ps) {"
+        << std::endl;
 
     // We need to set LR to INSTR_RETURN_LR for functions to return back
     // properly!
