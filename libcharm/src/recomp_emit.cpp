@@ -86,32 +86,35 @@ void Recompiler::emit_makefile(const std::string &output_dir) {
   std::ofstream ofs{makefile_path};
 
   ofs << "CXX ?= c++" << std::endl;
-  ofs << "CXXFLAGS = -Iliblayer/include -std=c++17 -fPIC -w -O2" << std::endl
+  ofs << "OPT = -O2" << std::endl;
+  ofs << "CXXFLAGS = -Iliblayer/include -std=c++17 -flto -fPIC -w" << std::endl
       << std::endl;
 
   ofs << "SRCS = code.cpp data.cpp" << std::endl;
-  ofs << "OBJS = $(SRCS:.cpp=.o) " << std::endl;
-  ofs << "EXEC = exec " << std::endl << std::endl;
+  ofs << "OBJS = $(SRCS:.cpp=.o)" << std::endl;
+  ofs << "NAME = exec" << std::endl << std::endl;
 
-  ofs << "LIBLAYER_STACK_BASE ?= " << LIBLAYER_STACK_BASE << std::endl;
-  ofs << "LIBLAYER_STACK_SIZE ?= " << LIBLAYER_STACK_SIZE << std::endl;
-  ofs << "LIBLAYER_DEBUG ?= 0" << std::endl << std::endl;
+  ofs << "STACK_BASE ?= " << LIBLAYER_STACK_BASE << std::endl;
+  ofs << "STACK_SIZE ?= " << LIBLAYER_STACK_SIZE << std::endl;
+  ofs << "DEBUG ?= 0" << std::endl;
   ofs << "SHARED ?= 0" << std::endl << std::endl;
 
-  ofs << "CXXFLAGS += -DLIBLAYER_STACK_BASE=$(LIBLAYER_STACK_BASE) \\"
-      << std::endl
-      << "\t-DLIBLAYER_STACK_SIZE=$(LIBLAYER_STACK_SIZE)" << std::endl
+  ofs << "CXXFLAGS += -DLIBLAYER_STACK_BASE=$(STACK_BASE) \\" << std::endl
+      << "\t-DLIBLAYER_STACK_SIZE=$(STACK_SIZE)" << std::endl
       << std::endl;
 
-  ofs << "ifeq ($(LIBLAYER_DEBUG),1)" << std::endl
-      << "\tCXXFLAGS += -DLIBLAYER_DEBUG" << std::endl
+  ofs << "ifeq ($(DEBUG),1)" << std::endl
+      << "\tCXXFLAGS += -g -DLIBLAYER_DEBUG" << std::endl
+      << "else" << std::endl
+      << "\tCXXFLAGS += $(OPT)" << std::endl
       << "endif" << std::endl
       << std::endl;
 
   ofs << "ifeq ($(SHARED),1)" << std::endl
       << "\tCXXFLAGS += -shared" << std::endl
-      << "\tEXEC := $(EXEC).so" << std::endl
-
+      << "\tEXEC := $(NAME).so" << std::endl
+      << "else" << std::endl
+      << "\tEXEC := $(NAME)" << std::endl
       << "endif" << std::endl
       << std::endl;
 
@@ -125,7 +128,7 @@ void Recompiler::emit_makefile(const std::string &output_dir) {
   ofs << "\t$(CXX) $(CXXFLAGS) -c $< -o $@" << std::endl << std::endl;
 
   ofs << "clean:" << std::endl;
-  ofs << "\trm -f $(OBJS) $(EXEC)" << std::endl;
+  ofs << "\trm -f $(OBJS) $(NAME) $(NAME).so" << std::endl;
 }
 
 void Recompiler::emit_code_header(const std::string &output_dir) {
@@ -193,142 +196,43 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
       << std::endl;
 
   ofs << std::endl
-      << MINIFY_COMMENT("/* MEMORY MAPPING */") << std::endl
+      << MINIFY_COMMENT("/* ADDRESS MAPPING */") << std::endl
       << std::endl;
 
-  ofs << "inline uint32_t ExecutionState::address_map(uintptr_t addr) {"
-      << std::endl;
+  emit_code_address_mappings(ofs);
+  emit_code_stubs(ofs);
 
-  // stack first because most most frequent access
-  ofs << "\tif(addr >= reinterpret_cast<uintptr_t>(stack) && addr < "
-         "reinterpret_cast<uintptr_t>(stack) + "
-         "LIBLAYER_STACK_SIZE) {"
-      << std::endl;
-  ofs << "\t\treturn LIBLAYER_STACK_BASE + static_cast<uint32_t>("
-      << "addr - reinterpret_cast<uintptr_t>(stack));" << std::endl;
-
-  ofs << "\t}" << std::endl;
-
-  for (auto &section : _elf.sections) {
-    if (!section_is_data(section.get())) {
-      continue;
-    }
-
-    auto name = symbol_name_map(section->get_name());
-    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
-
-    ofs << std::hex;
-    ofs << "\tif(addr >= reinterpret_cast<uintptr_t>(g_" << name << "_DATA)"
-        << " && addr < reinterpret_cast<uintptr_t>(g_" << name << "_DATA) + "
-        << name << "_SIZE) {" << std::endl;
-    ofs << "\t\treturn 0x" << (uint32_t)section->get_address()
-        << " + static_cast<uint32_t>("
-        << "addr - reinterpret_cast<uintptr_t>(g_" << name << "_DATA));"
-        << std::endl;
-
-    ofs << std::dec << "\t}" << std::endl;
-  }
-
-  ofs << "}" << std::endl << std::endl;
-
-  ofs << "inline uintptr_t ExecutionState::address_resolve(uint32_t addr) {"
-      << std::endl;
-
-  ofs << std::hex;
-
-  // stack first because most most frequent access
-  ofs << "\tif(addr >= LIBLAYER_STACK_BASE && addr < LIBLAYER_STACK_BASE + "
-         "LIBLAYER_STACK_SIZE) {"
-      << std::endl;
-  ofs << "\t\treturn reinterpret_cast<uintptr_t>(&stack[addr - "
-         "LIBLAYER_STACK_BASE]);"
-      << std::endl;
-
-  ofs << "\t}" << std::endl;
-
-  for (auto &section : _elf.sections) {
-    if (!section_is_data(section.get())) {
-      continue;
-    }
-
-    auto name = symbol_name_map(section->get_name());
-    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
-
-    ofs << "\tif(addr >= 0x" << section->get_address() << " && addr < 0x"
-        << section->get_address() + section->get_size() << ") {" << std::endl;
-    ofs << "\t\treturn reinterpret_cast<uintptr_t>(&reinterpret_cast<const "
-           "char*>(g_"
-        << name << "_DATA)[addr - 0x" << section->get_address() << "]);"
-        << std::endl;
-
-    ofs << "\t}" << std::endl;
-  }
-
-  ofs << std::dec;
-  ofs << "}" << std::endl << std::endl;
-
-  ofs << std::endl
-      << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl
-      << std::endl;
-
-  for (auto &functions : _funs_exports) {
-    ofs << "__attribute__((weak)) void internal_"
-        << symbol_name_map(functions.second.name) << "(ExecutionState& ps) {"
-        << std::endl;
-
-    // We need to set LR to INSTR_RETURN_LR for functions to return back
-    // properly!
-    ofs << "\tps.r[REG_LR] = INSTR_RETURN_LR;" << std::endl;
-
-    // Vinaly
-    ofs << "\teval(ps, 0x" << std::hex << functions.second.address << std::dec
-        << ");" << std::endl;
-
-    ofs << "}\n\n";
-  }
-
-  ofs << std::endl
-      << MINIFY_COMMENT("/* DEPENDENCIES */") << std::endl
-      << std::endl;
-
-  for (auto &functions : _funs_deps) {
-    if (!functions.second.is_external) {
-      continue;
-    }
-
-    ofs << "__attribute__((weak)) void external_" << functions.second.name
-        << "(ExecutionState& ps) {" << std::endl;
-    ofs << "\tstd::cout << \"stub: " << symbol_name_map(functions.second.name)
-        << "\" << std::endl;" << std::endl;
-    ofs << "}\n\n";
-  }
-
-  ofs << "void eval(ExecutionState& ps, uint32_t address) {\n";
-  ofs << "__start__:\n";
-  ofs << "\tswitch(address) {\n\n";
+  ofs << "void eval(ExecutionState& ps, uint32_t address) {" << std::endl;
+  ofs << "__start__:" << std::endl;
+  ofs << "\tswitch(address) {" << std::endl;
 
   ofs << MINIFY_COMMENT(
-      "\t// this is a special address that is used to return out of "
-      "function when PC is set it.\n");
+             "\t// this is a special address that is used to return out of "
+             "function when PC is set it.")
+      << std::endl;
 
-  ofs << "\tINSTR(INSTR_RETURN_LR) {\n";
-  ofs << "\t\treturn;\n";
-  ofs << "\t}\n\n";
+  ofs << "\tINSTR(INSTR_RETURN_LR) {" << std::endl;
+  ofs << "\t\treturn;" << std::endl;
+  ofs << "\t}" << std::endl << std::endl;
 
   for (auto &section : _elf.sections) {
     if (!section_is_code(section.get())) {
       continue;
     }
 
-    emit_section(ofs, section.get());
+    emit_code_section(ofs, section.get());
   }
 
-  ofs << "\t default:\n";
-  ofs << "\t\t throw std::runtime_error(\"Invalid address: \" + "
-         "std::to_string(address));";
+  ofs << "\tdefault:" << std::endl;
 
-  ofs << "\t}\n";
-  ofs << "}" << std::endl;
+  if (_minify) {
+    ofs << "\t\t__builtin_unreachable();";
+  } else {
+    ofs << "\t\tthrow std::runtime_error(\"Invalid address: \" + "
+           "std::to_string(address));";
+  }
+
+  ofs << std::endl << "\t}" << std::endl << "}" << std::endl;
 }
 
 void Recompiler::emit_data_header(const std::string &output_dir) {
@@ -433,7 +337,6 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
 
         for (auto &mapping : _got_mappings) {
           uintptr_t offset = std::get<0>(mapping) - section->get_address();
-
           if (offset != i) {
             continue;
           }
@@ -448,11 +351,124 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
       ss << std::dec;
     }
 
-    ofs << ss.rdbuf() << "\n};" << std::endl;
+    ofs << ss.rdbuf() << std::endl << "};" << std::endl;
   }
 }
 
-void Recompiler::emit_section(std::ofstream &ofs, ELFIO::section *section) {
+void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
+  ofs << "inline uint32_t ExecutionState::address_map(uintptr_t addr) {"
+      << std::endl;
+
+  // stack first because most most frequent access
+  ofs << "\tif(addr >= reinterpret_cast<uintptr_t>(stack) && addr < "
+         "reinterpret_cast<uintptr_t>(stack) + "
+         "LIBLAYER_STACK_SIZE) {"
+      << std::endl;
+  ofs << "\t\treturn LIBLAYER_STACK_BASE + static_cast<uint32_t>("
+      << "addr - reinterpret_cast<uintptr_t>(stack));" << std::endl;
+
+  ofs << "\t}" << std::endl;
+
+  for (auto &section : _elf.sections) {
+    if (!section_is_data(section.get())) {
+      continue;
+    }
+
+    auto name = symbol_name_map(section->get_name());
+    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+
+    ofs << std::hex;
+    ofs << "\tif(addr >= reinterpret_cast<uintptr_t>(g_" << name << "_DATA)"
+        << " && addr < reinterpret_cast<uintptr_t>(g_" << name << "_DATA) + "
+        << name << "_SIZE) {" << std::endl;
+    ofs << "\t\treturn 0x" << (uint32_t)section->get_address()
+        << " + static_cast<uint32_t>("
+        << "addr - reinterpret_cast<uintptr_t>(g_" << name << "_DATA));"
+        << std::endl;
+
+    ofs << std::dec << "\t}" << std::endl;
+  }
+
+  ofs << "}" << std::endl << std::endl;
+
+  ofs << "inline uintptr_t ExecutionState::address_resolve(uint32_t addr) {"
+      << std::endl;
+
+  ofs << std::hex;
+
+  // stack first because most most frequent access
+  ofs << "\tif(addr >= LIBLAYER_STACK_BASE && addr < LIBLAYER_STACK_BASE + "
+         "LIBLAYER_STACK_SIZE) {"
+      << std::endl;
+  ofs << "\t\treturn reinterpret_cast<uintptr_t>(&stack[addr - "
+         "LIBLAYER_STACK_BASE]);"
+      << std::endl;
+
+  ofs << "\t}" << std::endl;
+
+  for (auto &section : _elf.sections) {
+    if (!section_is_data(section.get())) {
+      continue;
+    }
+
+    auto name = symbol_name_map(section->get_name());
+    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+
+    ofs << "\tif(addr >= 0x" << section->get_address() << " && addr < 0x"
+        << section->get_address() + section->get_size() << ") {" << std::endl;
+    ofs << "\t\treturn reinterpret_cast<uintptr_t>(&reinterpret_cast<const "
+           "char*>(g_"
+        << name << "_DATA)[addr - 0x" << section->get_address() << "]);"
+        << std::endl;
+
+    ofs << "\t}" << std::endl;
+  }
+
+  ofs << std::dec;
+  ofs << "}" << std::endl << std::endl;
+}
+
+void Recompiler::emit_code_stubs(std::ofstream &ofs) {
+
+  ofs << std::endl
+      << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl
+      << std::endl;
+
+  for (auto &functions : _funs_exports) {
+    ofs << "__attribute__((weak)) void internal_"
+        << symbol_name_map(functions.second.name) << "(ExecutionState& ps) {"
+        << std::endl;
+
+    // We need to set LR to INSTR_RETURN_LR for functions to return back
+    // properly!
+    ofs << "\tps.r[REG_LR] = INSTR_RETURN_LR;" << std::endl;
+
+    // Vinaly
+    ofs << "\teval(ps, 0x" << std::hex << functions.second.address << std::dec
+        << ");" << std::endl;
+
+    ofs << "}" << std::endl << std::endl;
+  }
+
+  ofs << std::endl
+      << MINIFY_COMMENT("/* DEPENDENCY STUBS */") << std::endl
+      << std::endl;
+
+  for (auto &functions : _funs_deps) {
+    if (!functions.second.is_external) {
+      continue;
+    }
+
+    ofs << "__attribute__((weak)) void external_" << functions.second.name
+        << "(ExecutionState& ps) {" << std::endl;
+    ofs << "\tstd::cout << \"stub: " << symbol_name_map(functions.second.name)
+        << "\" << std::endl;" << std::endl;
+    ofs << "}" << std::endl << std::endl;
+  }
+}
+
+void Recompiler::emit_code_section(std::ofstream &ofs,
+                                   const ELFIO::section *section) {
   if (!section)
     return;
 
@@ -460,6 +476,10 @@ void Recompiler::emit_section(std::ofstream &ofs, ELFIO::section *section) {
 
   const auto data = section->get_data();
   const auto data_size = section->get_size();
+
+  if (!data) {
+    return;
+  }
 
   if (!_minify) {
     ofs << std::endl
@@ -472,7 +492,7 @@ void Recompiler::emit_section(std::ofstream &ofs, ELFIO::section *section) {
   for (size_t i = 0; i < data_size; i += sizeof(uint32_t)) {
     uintptr_t addr = section->get_address() + i;
 
-    ss << std::hex << "INSTR(0x" << addr << ") {" << std::dec << std::endl;
+    ss << std::hex << "\tINSTR(0x" << addr << ") {" << std::dec << std::endl;
 
     uint32_t instr_raw;
     memcpy(&instr_raw, data + i, sizeof(uint32_t));
@@ -488,9 +508,11 @@ void Recompiler::emit_section(std::ofstream &ofs, ELFIO::section *section) {
     }
 
     // now actual instruction
-    emit_arm(ss, instr, addr);
+    emit_code_arm(ss, instr, addr);
 
-    ss << "\t\t[[fallthrough]];\n\t}" << std::endl << std::endl;
+    ss << "\t\t[[fallthrough]];" << std::endl
+       << "\t}" << std::endl
+       << std::endl;
   }
 
   if (_minify) {
@@ -506,8 +528,17 @@ void Recompiler::emit_section(std::ofstream &ofs, ELFIO::section *section) {
   }
 }
 
-void Recompiler::emit_arm(std::ostream &os, arm::Instruction &instr,
-                          uintptr_t address) {
+void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
+                               uintptr_t address) {
+  if (instr.group == arm::InstructionGroup::INVALID) {
+    if (_minify) {
+      os << "\t\t__builtin_unreachable();";
+    } else {
+      os << "\t\tthrow std::runtime_error(\"Illegal instruction at 0x"
+         << std::hex << address << std::dec << "\");";
+    }
+    return;
+  }
 
   os << "\t\t" << COND_TABLE[(int)instr.cond] << "(";
 
@@ -797,10 +828,8 @@ void Recompiler::emit_arm(std::ostream &os, arm::Instruction &instr,
     os << MINIFY_COMMENT("/* swi */");
     break;
 
-  case arm::InstructionGroup::INVALID:
-    os << "throw std::runtime_error(\"Illegal instruction at 0x" << std::hex
-       << address << std::dec << "\")";
-    break;
+  default:
+    __builtin_unreachable();
   }
 
   os << ");" << std::endl;

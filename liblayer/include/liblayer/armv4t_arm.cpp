@@ -1,6 +1,7 @@
 #include "liblayer.hpp"
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
 #include <stdexcept>
 
 constexpr inline reg_value_t op2_lsl(reg_value_t value, reg_value_t amount) {
@@ -37,7 +38,6 @@ constexpr inline reg_value_t op2_ror(reg_value_t value, reg_value_t amount) {
   return (value >> amount) | (value << (32 - amount));
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_add(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_add: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -56,7 +56,6 @@ inline void ProgramState::arm_add(bool s, reg_idx_t rd, reg_idx_t rn,
                                << r[rd] << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_adc(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_adc: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -77,7 +76,6 @@ inline void ProgramState::arm_adc(bool s, reg_idx_t rd, reg_idx_t rn,
                                << r[rd] << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_sub(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_sub: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -96,7 +94,6 @@ inline void ProgramState::arm_sub(bool s, reg_idx_t rd, reg_idx_t rn,
                                << r[rd] << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_sbc: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -117,7 +114,6 @@ inline void ProgramState::arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn,
                                << r[rd] << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_cmp: before r" << static_cast<int>(rn) << "=" << std::hex
@@ -133,7 +129,6 @@ inline void ProgramState::arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ")" << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_mov(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_mov: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -147,7 +142,6 @@ inline void ProgramState::arm_mov(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_rsb: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -166,7 +160,6 @@ inline void ProgramState::arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn,
                                << r[rd] << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_rsc: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -187,7 +180,6 @@ inline void ProgramState::arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn,
                                << r[rd] << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_and(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_and: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -202,7 +194,6 @@ inline void ProgramState::arm_and(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_eor(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_eor: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -217,7 +208,6 @@ inline void ProgramState::arm_eor(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_orr(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_orr: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -232,7 +222,6 @@ inline void ProgramState::arm_orr(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_bic(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_bic: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -247,7 +236,6 @@ inline void ProgramState::arm_bic(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_mvn: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -261,7 +249,6 @@ inline void ProgramState::arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_tst(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_tst: before r" << static_cast<int>(rn) << "=" << std::hex
@@ -273,7 +260,6 @@ inline void ProgramState::arm_tst(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ", Z=" << z << ")" << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_teq(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_teq: before r" << static_cast<int>(rn) << "=" << std::hex
@@ -285,7 +271,6 @@ inline void ProgramState::arm_teq(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ", Z=" << z << ")" << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_value_t imm) {
   DEBUG_LOG("arm_cmn: before r" << static_cast<int>(rn) << "=" << std::hex
@@ -301,7 +286,6 @@ inline void ProgramState::arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ")" << std::dec);
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_idx_t rs, reg_idx_t rm) {
   DEBUG_LOG("arm_mul: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -317,7 +301,6 @@ inline void ProgramState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
                                   reg_idx_t rs, reg_idx_t rm) {
   DEBUG_LOG("arm_mla: before r" << static_cast<int>(rd) << "=" << std::hex
@@ -334,7 +317,6 @@ inline void ProgramState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_mull(bool s, bool sign, reg_idx_t rd_lo,
                                    reg_idx_t rd_hi, reg_idx_t rm,
                                    reg_idx_t rs) {
@@ -366,7 +348,6 @@ inline void ProgramState::arm_mull(bool s, bool sign, reg_idx_t rd_lo,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_mlal(bool s, bool sign, reg_idx_t rd_lo,
                                    reg_idx_t rd_hi, reg_idx_t rm,
                                    reg_idx_t rs) {
@@ -401,7 +382,6 @@ inline void ProgramState::arm_mlal(bool s, bool sign, reg_idx_t rd_lo,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_ldr(bool pre_indx, bool add, bool byte,
                                   bool write_back, reg_idx_t rn, reg_idx_t rd,
                                   reg_value_t offset, bool copy) {
@@ -433,7 +413,6 @@ inline void ProgramState::arm_ldr(bool pre_indx, bool add, bool byte,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_str(bool pre_indx, bool add, bool byte,
                                   bool write_back, reg_idx_t rn, reg_idx_t rd,
                                   reg_value_t offset, bool copy) {
@@ -468,7 +447,6 @@ inline void ProgramState::arm_str(bool pre_indx, bool add, bool byte,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_ldm(bool pre_indx, bool add, bool write_back,
                                   reg_idx_t rn, reg_value_t reg_list,
                                   bool copy) {
@@ -510,7 +488,6 @@ inline void ProgramState::arm_ldm(bool pre_indx, bool add, bool write_back,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_stm(bool pre_indx, bool add, bool write_back,
                                   reg_idx_t rn, reg_value_t reg_list,
                                   bool copy) {
@@ -551,7 +528,6 @@ inline void ProgramState::arm_stm(bool pre_indx, bool add, bool write_back,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_ldrh(bool pre_indx, bool add, bool write_back,
                                    reg_idx_t rn, reg_idx_t rd, uint8_t type,
                                    uint32_t offset) {
@@ -603,7 +579,6 @@ inline void ProgramState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   }
 }
 
-[[gnu::always_inline]]
 inline void ProgramState::arm_strh(bool pre_indx, bool add, bool write_back,
                                    reg_idx_t rn, reg_idx_t rd, uint8_t type,
                                    uint32_t offset) {

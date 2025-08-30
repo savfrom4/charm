@@ -33,8 +33,10 @@ private:
   void emit_data_header(const std::string &output_dir);
   void emit_data_source(const std::string &output_dir);
 
-  void emit_section(std::ofstream &ofs, ELFIO::section *section);
-  void emit_arm(std::ostream &os, arm::Instruction &instr, uintptr_t addr);
+  void emit_code_address_mappings(std::ofstream &ofs);
+  void emit_code_stubs(std::ofstream &ofs);
+  void emit_code_section(std::ofstream &ofs, const ELFIO::section *section);
+  void emit_code_arm(std::ostream &os, arm::Instruction &instr, uintptr_t addr);
 
   bool _minify;
   ELFIO::elfio _elf;
