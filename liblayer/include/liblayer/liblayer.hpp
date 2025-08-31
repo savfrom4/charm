@@ -1,9 +1,8 @@
 #pragma once
 #include <cstdint>
-#include <type_traits>
 
 #ifndef LIBLAYER_STACK_BASE
-#define LIBLAYER_STACK_BASE (0xBFFFFFF0) // Virtual address of stack pointer
+#define LIBLAYER_STACK_BASE (0xC0000000) // Virtual address of stack pointer
 #endif
 
 #ifndef LIBLAYER_STACK_SIZE
@@ -33,7 +32,7 @@ enum {
   REG_R7 = 7,
   REG_R8 = 8,
   REG_R9 = 9,
-  REG_R10 = 1,
+  REG_R10 = 10,
   REG_R11 = 11,
   REG_R12 = 12,
   REG_SP = 13,

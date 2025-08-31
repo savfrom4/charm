@@ -407,7 +407,7 @@ inline void ProgramState::arm_ldr(bool pre_indx, bool add, bool byte,
   }
 
   if (write_back || !pre_indx) {
-    r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
+    r[rn] = base + (add ? offset : -offset);
     DEBUG_LOG("arm_ldr: write back to r" << static_cast<int>(rn) << "="
                                          << std::hex << r[rn] << std::dec);
   }
@@ -441,8 +441,8 @@ inline void ProgramState::arm_str(bool pre_indx, bool add, bool byte,
   }
 
   if (write_back || !pre_indx) {
-    r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
-    DEBUG_LOG("arm_str: write back to r" << static_cast<int>(rn) << "="
+    r[rn] = base + (add ? offset : -offset);
+    DEBUG_LOG("arm_ldr: write back to r" << static_cast<int>(rn) << "="
                                          << std::hex << r[rn] << std::dec);
   }
 }
@@ -492,7 +492,7 @@ inline void ProgramState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   }
 
   if (write_back || !pre_indx) {
-    r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
+    r[rn] = base + (add ? offset : -offset);
     DEBUG_LOG("arm_ldrh: write back to r" << static_cast<int>(rn) << "="
                                           << std::hex << r[rn] << std::dec);
   }
@@ -538,7 +538,7 @@ inline void ProgramState::arm_strh(bool pre_indx, bool add, bool write_back,
   }
 
   if (write_back || !pre_indx) {
-    r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
+    r[rn] = base + (add ? offset : -offset);
     DEBUG_LOG("arm_strh: write back to r" << static_cast<int>(rn) << "="
                                           << std::hex << r[rn] << std::dec);
   }
@@ -560,7 +560,8 @@ inline void ProgramState::arm_ldm(bool pre_indx, bool add, bool write_back,
   DEBUG_LOG("arm_ldm: r" << static_cast<int>(rn) << ", reg_list=" << std::hex
                          << reg_list << ", pre_indx=" << pre_indx
                          << ", add=" << add << ", write_back=" << write_back
-                         << ", starting addr=" << addr << std::dec);
+                         << ", base=" << base << ", starting addr=" << addr
+                         << std::dec);
 
   if (write_back) {
     r[rn] = add ? base + n * 4 : base - n * 4;
@@ -601,7 +602,8 @@ inline void ProgramState::arm_stm(bool pre_indx, bool add, bool write_back,
   DEBUG_LOG("arm_stm: r" << static_cast<int>(rn) << ", reg_list=" << std::hex
                          << reg_list << ", pre_indx=" << pre_indx
                          << ", add=" << add << ", write_back=" << write_back
-                         << ", starting addr=" << addr << std::dec);
+                         << ", base = " << base << ", starting addr=" << addr
+                         << std::dec);
 
   if (copy) {
     char *mem = reinterpret_cast<char *>(address_resolve(addr));
