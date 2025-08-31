@@ -556,7 +556,7 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
          << MINIFY_COMMENT_COMMA(" /* rn */, ")
 
          << "0x" << std::hex << instr.data.op2_imm << std::dec
-         << MINIFY_COMMENT(" /* op2_imm */") << ")";
+         << MINIFY_COMMENT(" /* op2_imm */") << ");";
       break;
     }
 
@@ -577,7 +577,7 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
          << MINIFY_COMMENT_COMMA(" /* rm */, ")
 
          << "ps.r[" << REGISTER_TABLE[(int)instr.data.op2_reg.amount_or_rs]
-         << "]" << MINIFY_COMMENT(" /* rs */") << "))";
+         << "]" << MINIFY_COMMENT(" /* rs */") << "));";
 
     } else {
       os << OPCODE_TABLE[(int)instr.data.op] << "("
@@ -596,7 +596,30 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
          << MINIFY_COMMENT_COMMA(" /* rm */, ")
 
          << "0x" << std::hex << (uint32_t)instr.data.op2_reg.amount_or_rs
-         << std::dec << MINIFY_COMMENT(" /* amount */") << "))";
+         << std::dec << MINIFY_COMMENT(" /* amount */") << "));";
+    }
+
+    switch (instr.data.op) {
+    case arm::Opcode::TST:
+    case arm::Opcode::TEQ:
+    case arm::Opcode::CMP:
+    case arm::Opcode::CMN:
+    case arm::Opcode::BIC:
+    case arm::Opcode::COUNT:
+    case arm::Opcode::INVALID:
+      break;
+
+    default: {
+      if (instr.data.rd != arm::Register::PC) {
+        break;
+      }
+
+      os << " address = " << std::hex << "ps.r[" << REGISTER_TABLE[REG_PC]
+         << "]; goto __start__;";
+
+      os << MINIFY_COMMENT(" /* this instruction modifies pc */");
+      break;
+    }
     }
 
     break;
@@ -757,7 +780,18 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
     }
 
     os << std::dec;
-    os << ", true" << MINIFY_COMMENT(" /* copy */") << ")";
+    os << ", true" << MINIFY_COMMENT(" /* copy */") << ");";
+
+    if (instr.data_trans.load) {
+      if (instr.data_trans.rd != arm::Register::PC) {
+        break;
+      }
+
+      os << " address = " << std::hex << "ps.r[" << REGISTER_TABLE[REG_PC]
+         << "]; goto __start__;";
+
+      os << MINIFY_COMMENT(" /* this instruction modifies pc */");
+    }
 
     break;
 
@@ -820,6 +854,8 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
       os << REGISTER_TABLE[(int)instr.hw_data_trans.rm]
          << MINIFY_COMMENT(" /* rm */");
     }
+
+    // TODO: fix this
 
     os << std::dec << ")";
     break;

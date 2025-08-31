@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <type_traits>
 
 #ifndef LIBLAYER_STACK_BASE
 #define LIBLAYER_STACK_BASE (0xBFFFFFF0) // Virtual address of stack pointer
@@ -117,6 +118,7 @@ public:
                 reg_idx_t rd, uint8_t type, uint32_t offset);
 
   /* THUMB instructions */
+  // TODO: add thumb
 };
 
 /* Conditions */

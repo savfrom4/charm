@@ -179,11 +179,12 @@ void Recompiler::analyze_map_plt_to_reloc() {
       }
 
       uintptr_t end = emu.ps.r[(int)arm::Register::PC] - 8;
+
       for (uintptr_t i = start; i < end; i++) {
         _fun_deps_mapped[i] = &_funs_deps[result];
       }
 
-      start = end + 4;
+      start = end;
     }
   } catch (std::exception &e) {
     // TODO: hacky way, implement proper handling

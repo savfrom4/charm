@@ -379,7 +379,8 @@ void Instruction::dump(std::ostream &ofs) {
 
     if (is_imm) {
       if (data_trans.offset_imm != 0)
-        ofs << ", #" << (uint32_t)data_trans.offset_imm;
+        ofs << ", #" << (data_trans.add ? "" : "-")
+            << (uint32_t)data_trans.offset_imm;
     } else {
       ofs << ", " << REGISTER_TABLE[(int)data_trans.offset_reg.rm];
       if (data_trans.offset_reg.amount_or_rs != 0) {

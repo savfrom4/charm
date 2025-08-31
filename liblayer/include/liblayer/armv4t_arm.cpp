@@ -388,8 +388,8 @@ inline void ProgramState::arm_ldr(bool pre_indx, bool add, bool byte,
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
 
-  DEBUG_LOG("arm_ldr: r" << static_cast<int>(rn) << ", r"
-                         << static_cast<int>(rd) << ", offset=" << offset
+  DEBUG_LOG("arm_ldr: r" << static_cast<int>(rd) << ", r"
+                         << static_cast<int>(rn) << ", offset=" << offset
                          << ", pre_indx=" << pre_indx << ", add=" << add
                          << ", byte=" << byte << ", write_back=" << write_back
                          << ", addr=" << std::hex << addr << std::dec);
@@ -406,7 +406,7 @@ inline void ProgramState::arm_ldr(bool pre_indx, bool add, bool byte,
     DEBUG_LOG("arm_ldr: read value=" << std::hex << r[rd] << std::dec);
   }
 
-  if (write_back) {
+  if (write_back || !pre_indx) {
     r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
     DEBUG_LOG("arm_ldr: write back to r" << static_cast<int>(rn) << "="
                                          << std::hex << r[rn] << std::dec);
@@ -419,8 +419,8 @@ inline void ProgramState::arm_str(bool pre_indx, bool add, bool byte,
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
 
-  DEBUG_LOG("arm_str: r" << static_cast<int>(rn) << ", r"
-                         << static_cast<int>(rd) << ", offset=" << offset
+  DEBUG_LOG("arm_str: r" << static_cast<int>(rd) << ", r"
+                         << static_cast<int>(rn) << ", offset=" << offset
                          << ", pre_indx=" << pre_indx << ", add=" << add
                          << ", byte=" << byte << ", write_back=" << write_back
                          << ", addr=" << std::hex << addr << std::dec);
@@ -440,90 +440,9 @@ inline void ProgramState::arm_str(bool pre_indx, bool add, bool byte,
     }
   }
 
-  if (write_back) {
+  if (write_back || !pre_indx) {
     r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
     DEBUG_LOG("arm_str: write back to r" << static_cast<int>(rn) << "="
-                                         << std::hex << r[rn] << std::dec);
-  }
-}
-
-inline void ProgramState::arm_ldm(bool pre_indx, bool add, bool write_back,
-                                  reg_idx_t rn, reg_value_t reg_list,
-                                  bool copy) {
-  reg_value_t base = r[rn];
-  reg_value_t n = __builtin_popcount(reg_list);
-  reg_value_t addr;
-
-  if (add) {
-    addr = pre_indx ? base + 4 : base;
-  } else {
-    addr = pre_indx ? base - (n * 4) : base - 4;
-  }
-
-  DEBUG_LOG("arm_ldm: r" << static_cast<int>(rn) << ", reg_list=" << std::hex
-                         << reg_list << ", pre_indx=" << pre_indx
-                         << ", add=" << add << ", write_back=" << write_back
-                         << ", starting addr=" << addr << std::dec);
-
-  if (copy) {
-    const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
-    for (reg_value_t i = 0; i < REG_COUNT; i++) {
-      if (!((reg_list >> i) & 1)) {
-        continue;
-      }
-
-      memcpy(&r[i], mem, sizeof(uint32_t));
-      DEBUG_LOG("arm_ldm: read r" << static_cast<int>(i) << "=" << std::hex
-                                  << r[i] << " from addr=" << std::hex
-                                  << reinterpret_cast<uintptr_t>(mem)
-                                  << std::dec);
-      mem += 4;
-    }
-  }
-
-  if (write_back) {
-    r[rn] = add ? base + n * 4 : base - n * 4;
-    DEBUG_LOG("arm_ldm: write back to r" << static_cast<int>(rn) << "="
-                                         << std::hex << r[rn] << std::dec);
-  }
-}
-
-inline void ProgramState::arm_stm(bool pre_indx, bool add, bool write_back,
-                                  reg_idx_t rn, reg_value_t reg_list,
-                                  bool copy) {
-  reg_value_t base = r[rn];
-  reg_value_t n = __builtin_popcount(reg_list);
-  reg_value_t addr;
-
-  if (add) {
-    addr = pre_indx ? base + 4 : base;
-  } else {
-    addr = pre_indx ? base - (n * 4) : base - 4;
-  }
-
-  DEBUG_LOG("arm_stm: r" << static_cast<int>(rn) << ", reg_list=" << std::hex
-                         << reg_list << ", pre_indx=" << pre_indx
-                         << ", add=" << add << ", write_back=" << write_back
-                         << ", starting addr=" << addr << std::dec);
-
-  if (copy) {
-    char *mem = reinterpret_cast<char *>(address_resolve(addr));
-    for (reg_value_t i = 0; i < REG_COUNT; i++) {
-      if (!((reg_list >> i) & 1)) {
-        continue;
-      }
-
-      memcpy(mem, &r[i], sizeof(uint32_t));
-      DEBUG_LOG("arm_stm: wrote r"
-                << static_cast<int>(i) << "=" << std::hex << r[i] << " to addr="
-                << std::hex << reinterpret_cast<uintptr_t>(mem) << std::dec);
-      mem += 4;
-    }
-  }
-
-  if (write_back) {
-    r[rn] = add ? base + n * 4 : base - n * 4;
-    DEBUG_LOG("arm_stm: write back to r" << static_cast<int>(rn) << "="
                                          << std::hex << r[rn] << std::dec);
   }
 }
@@ -545,8 +464,8 @@ inline void ProgramState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   case 0b00:
     throw std::runtime_error("arm_ldrh: SWP unimplemented!");
 
-  case 0b01:   // LDRH
-    r[rd] = 0; // Clear upper bits
+  case 0b01: // LDRH
+    r[rd] = 0;
     memcpy(&r[rd], mem, sizeof(uint16_t));
     DEBUG_LOG("arm_ldrh: read halfword value=" << std::hex << r[rd]
                                                << " from addr=" << std::hex
@@ -572,7 +491,7 @@ inline void ProgramState::arm_ldrh(bool pre_indx, bool add, bool write_back,
     break;
   }
 
-  if (write_back) {
+  if (write_back || !pre_indx) {
     r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
     DEBUG_LOG("arm_ldrh: write back to r" << static_cast<int>(rn) << "="
                                           << std::hex << r[rn] << std::dec);
@@ -603,16 +522,14 @@ inline void ProgramState::arm_strh(bool pre_indx, bool add, bool write_back,
                                                 << addr << std::dec);
     break;
 
-  case 0b10: // STRSB - This seems like a typo, STR doesn't have signed byte.
-             // It's likely a simple STRB.
+  case 0b10: // STRSB
     memcpy(mem, &r[rd], sizeof(int8_t));
     DEBUG_LOG("arm_strh: wrote byte value=" << std::hex << (r[rd] & 0xFF)
                                             << " to addr=" << std::hex << addr
                                             << std::dec);
     break;
 
-  case 0b11: // STRSH - This seems like a typo, STR doesn't have signed
-             // halfword. It's likely a simple STRH.
+  case 0b11: // STRSH
     memcpy(mem, &r[rd], sizeof(int16_t));
     DEBUG_LOG("arm_strh: wrote halfword value=" << std::hex << (r[rd] & 0xFFFF)
                                                 << " to addr=" << std::hex
@@ -620,9 +537,97 @@ inline void ProgramState::arm_strh(bool pre_indx, bool add, bool write_back,
     break;
   }
 
-  if (write_back) {
+  if (write_back || !pre_indx) {
     r[rn] = pre_indx ? addr : base + (add ? offset : -offset);
     DEBUG_LOG("arm_strh: write back to r" << static_cast<int>(rn) << "="
                                           << std::hex << r[rn] << std::dec);
+  }
+}
+
+inline void ProgramState::arm_ldm(bool pre_indx, bool add, bool write_back,
+                                  reg_idx_t rn, reg_value_t reg_list,
+                                  bool copy) {
+  reg_value_t base = r[rn];
+  reg_value_t n = __builtin_popcount(reg_list);
+  reg_value_t addr;
+
+  if (add) {
+    addr = pre_indx ? base + 4 : base;
+  } else {
+    addr = pre_indx ? base - (n * 4) : base - 4;
+  }
+
+  DEBUG_LOG("arm_ldm: r" << static_cast<int>(rn) << ", reg_list=" << std::hex
+                         << reg_list << ", pre_indx=" << pre_indx
+                         << ", add=" << add << ", write_back=" << write_back
+                         << ", starting addr=" << addr << std::dec);
+
+  if (write_back) {
+    r[rn] = add ? base + n * 4 : base - n * 4;
+    DEBUG_LOG("arm_ldm: write back to r" << static_cast<int>(rn) << "="
+                                         << std::hex << r[rn] << std::dec);
+  }
+
+  if (copy) {
+    const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
+    for (reg_value_t i = 0; i < REG_COUNT; i++) {
+      if (!((reg_list >> i) & 1)) {
+        continue;
+      }
+
+      memcpy(&r[i], mem, sizeof(uint32_t));
+      DEBUG_LOG("arm_ldm: read r" << static_cast<int>(i) << "=" << std::hex
+                                  << r[i] << " from addr=" << std::hex
+                                  << reinterpret_cast<uintptr_t>(mem)
+                                  << std::dec);
+      mem += 4;
+    }
+  }
+}
+
+inline void ProgramState::arm_stm(bool pre_indx, bool add, bool write_back,
+                                  reg_idx_t rn, reg_value_t reg_list,
+                                  bool copy) {
+  reg_value_t base = r[rn];
+  reg_value_t n = __builtin_popcount(reg_list);
+  reg_value_t addr;
+
+  if (add) {
+    addr = pre_indx ? base + 4 : base;
+  } else {
+    addr = pre_indx ? base - n * 4 : base - 4;
+  }
+
+  DEBUG_LOG("arm_stm: r" << static_cast<int>(rn) << ", reg_list=" << std::hex
+                         << reg_list << ", pre_indx=" << pre_indx
+                         << ", add=" << add << ", write_back=" << write_back
+                         << ", starting addr=" << addr << std::dec);
+
+  if (copy) {
+    char *mem = reinterpret_cast<char *>(address_resolve(addr));
+    bool written = false;
+
+    for (reg_value_t i = 0; i < REG_COUNT; i++) {
+      if (!((reg_list >> i) & 1)) {
+        continue;
+      }
+
+      memcpy(mem, &r[i], sizeof(uint32_t));
+      DEBUG_LOG("arm_stm: wrote r"
+                << static_cast<int>(i) << "=" << std::hex << r[i] << " to addr="
+                << std::hex << reinterpret_cast<uintptr_t>(mem) << std::dec);
+      mem += 4;
+
+      if (!write_back || written) {
+        continue;
+      }
+
+      // We write-back now
+      r[rn] = add ? base + n * 4 : base - n * 4;
+      DEBUG_LOG("arm_stm: write back (n = " << n << ") to r"
+                                            << static_cast<int>(rn) << "="
+                                            << std::hex << r[rn] << std::dec);
+      written = true;
+    }
   }
 }
