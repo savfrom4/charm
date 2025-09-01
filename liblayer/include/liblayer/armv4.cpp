@@ -41,8 +41,8 @@ constexpr inline reg_value_t op2_ror(reg_value_t value, reg_value_t amount) {
   return (value >> amount) | (value << (32 - amount));
 }
 
-inline void ProgramState::arm_add(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_add(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_add: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
@@ -60,8 +60,8 @@ inline void ProgramState::arm_add(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_add: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_adc(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_adc(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_adc: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm << ", cs=" << cs);
@@ -80,8 +80,8 @@ inline void ProgramState::arm_adc(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_adc: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_sub(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_sub(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_sub: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
@@ -99,8 +99,8 @@ inline void ProgramState::arm_sub(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_sub: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_sbc: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm << ", cs=" << cs);
@@ -119,8 +119,8 @@ inline void ProgramState::arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_sbc: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_cmp: before r" << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
 
@@ -135,8 +135,8 @@ inline void ProgramState::arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ", C=" << cs << ", V=" << vs << ")");
 }
 
-inline void ProgramState::arm_mov(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_mov(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_mov: before r" << static_cast<int>(rd) << "=" << r[rd]
                                 << ", imm=" << imm);
 
@@ -149,8 +149,8 @@ inline void ProgramState::arm_mov(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_mov: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_rsb: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
@@ -168,8 +168,8 @@ inline void ProgramState::arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_rsb: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_rsc: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm << ", cs=" << cs);
@@ -189,8 +189,8 @@ inline void ProgramState::arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_rsc: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_and(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_and(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_and: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
@@ -204,8 +204,8 @@ inline void ProgramState::arm_and(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_and: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_eor(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_eor(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_eor: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
@@ -219,8 +219,8 @@ inline void ProgramState::arm_eor(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_eor: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_orr(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_orr(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_orr: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
@@ -233,8 +233,8 @@ inline void ProgramState::arm_orr(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_orr: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_bic(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_bic(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_bic: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
@@ -248,8 +248,8 @@ inline void ProgramState::arm_bic(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_bic: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_mvn: before r" << static_cast<int>(rd) << "=" << r[rd]
                                 << ", imm=" << imm);
   r[rd] = ~imm;
@@ -262,8 +262,8 @@ inline void ProgramState::arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_mvn: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_tst(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_tst(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_tst: before r" << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
 
@@ -275,8 +275,8 @@ inline void ProgramState::arm_tst(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ")");
 }
 
-inline void ProgramState::arm_teq(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_teq(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_teq: before r" << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
 
@@ -288,8 +288,8 @@ inline void ProgramState::arm_teq(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ")");
 }
 
-inline void ProgramState::arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_value_t imm) {
+inline void ExecutionState::arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_value_t imm) {
   DEBUG_LOG("arm_cmn: before r" << static_cast<int>(rn) << "=" << r[rn]
                                 << ", imm=" << imm);
   reg_value_t result;
@@ -303,8 +303,8 @@ inline void ProgramState::arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn,
                                << ", C=" << cs << ", V=" << vs << ")");
 }
 
-inline void ProgramState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_idx_t rs, reg_idx_t rm) {
+inline void ExecutionState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_idx_t rs, reg_idx_t rm) {
   DEBUG_LOG("arm_mul: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rm) << "=" << r[rm] << ", r"
                                 << static_cast<int>(rs) << "=" << r[rs]);
@@ -318,8 +318,8 @@ inline void ProgramState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_mul: after r" << static_cast<int>(rd) << "=" < < < r[rd]);
 }
 
-inline void ProgramState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
-                                  reg_idx_t rs, reg_idx_t rm) {
+inline void ExecutionState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
+                                    reg_idx_t rs, reg_idx_t rm) {
   DEBUG_LOG("arm_mla: before r" << static_cast<int>(rd) << "=" << r[rd] << ", r"
                                 << static_cast<int>(rm) << "=" << r[rm] << ", r"
                                 << static_cast<int>(rs) << "=" << r[rs] << ", r"
@@ -334,9 +334,9 @@ inline void ProgramState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
   DEBUG_LOG("arm_mla: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
-inline void ProgramState::arm_mull(bool s, bool sign, reg_idx_t rd_lo,
-                                   reg_idx_t rd_hi, reg_idx_t rm,
-                                   reg_idx_t rs) {
+inline void ExecutionState::arm_mull(bool s, bool sign, reg_idx_t rd_lo,
+                                     reg_idx_t rd_hi, reg_idx_t rm,
+                                     reg_idx_t rs) {
   DEBUG_LOG("arm_mull: before r" << static_cast<int>(rd_lo) << "=" << r[rd_lo]
                                  << ", r" << static_cast<int>(rd_hi) << "="
                                  << r[rd_hi] << ", r" << static_cast<int>(rm)
@@ -365,9 +365,9 @@ inline void ProgramState::arm_mull(bool s, bool sign, reg_idx_t rd_lo,
   }
 }
 
-inline void ProgramState::arm_mlal(bool s, bool sign, reg_idx_t rd_lo,
-                                   reg_idx_t rd_hi, reg_idx_t rm,
-                                   reg_idx_t rs) {
+inline void ExecutionState::arm_mlal(bool s, bool sign, reg_idx_t rd_lo,
+                                     reg_idx_t rd_hi, reg_idx_t rm,
+                                     reg_idx_t rs) {
   DEBUG_LOG("arm_mlal: before r" << static_cast<int>(rd_lo) << "=" << r[rd_lo]
                                  << ", r" << static_cast<int>(rd_hi) << "="
                                  << r[rd_hi] << ", r" << static_cast<int>(rm)
@@ -399,9 +399,9 @@ inline void ProgramState::arm_mlal(bool s, bool sign, reg_idx_t rd_lo,
   }
 }
 
-inline void ProgramState::arm_ldr(bool pre_indx, bool add, bool byte,
-                                  bool write_back, reg_idx_t rn, reg_idx_t rd,
-                                  reg_value_t offset, bool copy) {
+inline void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
+                                    bool write_back, reg_idx_t rn, reg_idx_t rd,
+                                    reg_value_t offset, bool copy) {
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
 
@@ -437,9 +437,9 @@ inline void ProgramState::arm_ldr(bool pre_indx, bool add, bool byte,
   }
 }
 
-inline void ProgramState::arm_str(bool pre_indx, bool add, bool byte,
-                                  bool write_back, reg_idx_t rn, reg_idx_t rd,
-                                  reg_value_t offset, bool copy) {
+inline void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
+                                    bool write_back, reg_idx_t rn, reg_idx_t rd,
+                                    reg_value_t offset, bool copy) {
   reg_value_t base = r[rn];
   reg_value_t value = r[rd];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
@@ -485,9 +485,9 @@ inline void ProgramState::arm_str(bool pre_indx, bool add, bool byte,
   }
 }
 
-inline void ProgramState::arm_ldrh(bool pre_indx, bool add, bool write_back,
-                                   reg_idx_t rn, reg_idx_t rd, uint8_t type,
-                                   uint32_t offset) {
+inline void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
+                                     reg_idx_t rn, reg_idx_t rd, uint8_t type,
+                                     uint32_t offset) {
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
 
@@ -545,9 +545,9 @@ inline void ProgramState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   }
 }
 
-inline void ProgramState::arm_strh(bool pre_indx, bool add, bool write_back,
-                                   reg_idx_t rn, reg_idx_t rd, uint8_t type,
-                                   uint32_t offset) {
+inline void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
+                                     reg_idx_t rn, reg_idx_t rd, uint8_t type,
+                                     uint32_t offset) {
   reg_value_t base = r[rn];
   reg_value_t value = r[rd];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
@@ -604,9 +604,9 @@ inline void ProgramState::arm_strh(bool pre_indx, bool add, bool write_back,
   }
 }
 
-inline void ProgramState::arm_ldm(bool pre_indx, bool add, bool write_back,
-                                  reg_idx_t rn, reg_value_t reg_list,
-                                  bool copy) {
+inline void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
+                                    reg_idx_t rn, reg_value_t reg_list,
+                                    bool copy) {
   reg_value_t base = r[rn];
   reg_value_t n = __builtin_popcount(reg_list);
   reg_value_t addr;
@@ -646,9 +646,9 @@ inline void ProgramState::arm_ldm(bool pre_indx, bool add, bool write_back,
   }
 }
 
-inline void ProgramState::arm_stm(bool pre_indx, bool add, bool write_back,
-                                  reg_idx_t rn, reg_value_t reg_list,
-                                  bool copy) {
+inline void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
+                                    reg_idx_t rn, reg_value_t reg_list,
+                                    bool copy) {
   reg_value_t base = r[rn];
   reg_value_t n = __builtin_popcount(reg_list);
   reg_value_t addr;

@@ -13,7 +13,7 @@ namespace charm {
 
 class Emulator;
 
-class EmulationState : public ProgramState {
+class EmulationState : public ExecutionState {
 public:
   ELFIO::elfio *_elf;
 

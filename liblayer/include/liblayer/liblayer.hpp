@@ -1,12 +1,21 @@
 #pragma once
 #include <cstdint>
+#include <cstring>
 
 #ifndef LIBLAYER_STACK_BASE
 #define LIBLAYER_STACK_BASE (0xC0000000) // Virtual address of stack pointer
 #endif
 
 #ifndef LIBLAYER_STACK_SIZE
-#define LIBLAYER_STACK_SIZE (1024 * 1024) // Size of the stack
+#define LIBLAYER_STACK_SIZE (1024 * 1024) // Size of the stack (1 MB)
+#endif
+
+#ifndef LIBLAYER_MEMORY_BASE
+#define LIBLAYER_MEMORY_BASE (0x10000000) // Virtual address of the memory
+#endif
+
+#ifndef LIBLAYER_MEMORY_SIZE
+#define LIBLAYER_MEMORY_SIZE (1024 * 1024 * 16) // Size of the memory (16 MB)
 #endif
 
 #ifdef LIBLAYER_DEBUG
@@ -19,6 +28,9 @@
   do {                                                                         \
   } while (0)
 #endif
+
+typedef uint8_t reg_idx_t;
+typedef uint32_t reg_value_t;
 
 // REGISTERS
 enum {
@@ -41,10 +53,7 @@ enum {
   REG_COUNT = 16,
 };
 
-typedef uint8_t reg_idx_t;
-typedef uint32_t reg_value_t;
-
-class ProgramState {
+class ExecutionState {
 public:
   reg_value_t r[REG_COUNT] = {
       0, 0,
@@ -63,14 +72,24 @@ public:
       z;   /* zero */
 
   uint8_t stack[LIBLAYER_STACK_SIZE] = {0}; /* stack */
+  uint8_t *memory = nullptr;                /* memory */
 
-  // These functions are used to map addresses. You can use them to create your
-  // own virtual addressing space
+  inline ExecutionState() {
+    memory = new uint8_t[LIBLAYER_MEMORY_SIZE];
+    memset(memory, 0, LIBLAYER_MEMORY_SIZE);
+  }
 
-  virtual uint32_t address_map(uintptr_t addr) = 0;
-  virtual uintptr_t address_resolve(uint32_t addr) = 0;
+  inline ~ExecutionState() { delete[] memory; }
 
-  // General purporse
+  virtual uint32_t address_map(uintptr_t addr);
+  virtual uintptr_t address_resolve(uint32_t addr);
+
+  // Allocations
+
+  virtual void *alloc(uint32_t size);
+  virtual void free(void *p);
+
+  // armv4
 
   void arm_add(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
   void arm_adc(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
@@ -89,19 +108,13 @@ public:
   void arm_teq(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
   void arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
 
-  // Multiply
-
   void arm_mul(bool s, reg_idx_t rd, reg_idx_t rn, reg_idx_t rs, reg_idx_t rm);
   void arm_mla(bool s, reg_idx_t rd, reg_idx_t rn, reg_idx_t rs, reg_idx_t rm);
-
-  // Multiply-Long
 
   void arm_mull(bool s, bool sign, reg_idx_t rd_hi, reg_idx_t rd_lo,
                 reg_idx_t rs, reg_idx_t rm);
   void arm_mlal(bool s, bool sign, reg_idx_t rd_hi, reg_idx_t rd_lo,
                 reg_idx_t rs, reg_idx_t rm);
-
-  // Load/Store (Multiple/Half-word)
 
   void arm_ldr(bool pre_indx, bool add, bool byte, bool write_back,
                reg_idx_t rn, reg_idx_t rd, reg_value_t offset, bool copy);
@@ -121,87 +134,9 @@ public:
 };
 
 /* Conditions */
-
-#define EQ(x)                                                                  \
-  if (ps.z) {                                                                  \
-    x;                                                                         \
-  }
-
-#define NE(x)                                                                  \
-  if (!ps.z) {                                                                 \
-    x;                                                                         \
-  }
-
-#define CS(x)                                                                  \
-  if (ps.cs) {                                                                 \
-    x;                                                                         \
-  }
-
-#define CC(x)                                                                  \
-  if (!ps.cs) {                                                                \
-    x;                                                                         \
-  }
-
-#define MI(x)                                                                  \
-  if (ps.mi) {                                                                 \
-    x;                                                                         \
-  }
-
-#define PL(x)                                                                  \
-  if (!ps.mi) {                                                                \
-    x;                                                                         \
-  }
-
-#define VS(x)                                                                  \
-  if (ps.vs) {                                                                 \
-    x;                                                                         \
-  }
-
-#define VC(x)                                                                  \
-  if (!ps.vs) {                                                                \
-    x;                                                                         \
-  }
-
-#define HI(x)                                                                  \
-  if (ps.cs && !ps.z) {                                                        \
-    x;                                                                         \
-  }
-
-#define LS(x)                                                                  \
-  if (!ps.cs || ps.z) {                                                        \
-    x;                                                                         \
-  }
-
-#define GE(x)                                                                  \
-  if (ps.mi == ps.vs) {                                                        \
-    x;                                                                         \
-  }
-
-#define LT(x)                                                                  \
-  if (ps.mi != ps.vs) {                                                        \
-    x;                                                                         \
-  }
-
-#define GT(x)                                                                  \
-  if (!ps.z && (ps.mi == ps.vs)) {                                             \
-    x;                                                                         \
-  }
-
-#define LE(x)                                                                  \
-  if (ps.z || (ps.mi != ps.vs)) {                                              \
-    x;                                                                         \
-  }
-
-#define AL(x)                                                                  \
-  if (1) {                                                                     \
-    x;                                                                         \
-  }
-
-#define NV(x)                                                                  \
-  if (0) {                                                                     \
-    x;                                                                         \
-  }
+#include "conditions.hpp"
 
 #ifdef LIBLAYER_IMPL
-#include "armv4.cpp" // ARMv4T (ARM instructions)
+#include "armv4.cpp"  // ARMv4 (ARM instructions)
+#include "memory.cpp" // addressing / alloc / free
 #endif

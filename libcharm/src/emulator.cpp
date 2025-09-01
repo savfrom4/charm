@@ -14,7 +14,7 @@
 
 namespace charm {
 
-reg_value_t shift(ProgramState &ps, charm::arm::Shifter shifter);
+reg_value_t shift(EmulationState &ps, charm::arm::Shifter shifter);
 
 inline uint32_t EmulationState::address_map(uintptr_t addr) {
   for (auto &section : _elf->sections) {
@@ -306,7 +306,7 @@ inline void Emulator::arm_data_processing(const arm::Instruction &instr) {
   }
 }
 
-inline reg_value_t shift(ProgramState &ps, charm::arm::Shifter shifter) {
+inline reg_value_t shift(EmulationState &ps, charm::arm::Shifter shifter) {
   reg_value_t value = ps.r[(reg_idx_t)shifter.rm];
   reg_value_t amount =
       shifter.is_reg ? ps.r[shifter.amount_or_rs] : shifter.amount_or_rs;

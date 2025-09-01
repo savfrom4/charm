@@ -144,20 +144,20 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
   ofs << "#pragma once" << std::endl;
   ofs << "#include <liblayer/liblayer.hpp>" << std::endl << std::endl;
 
-  ofs << "class ExecutionState : public ProgramState {" << std::endl;
+  ofs << "class ProgramState : public ExecutionState {" << std::endl;
   ofs << "public:" << std::endl;
   ofs << "\tuint32_t address_map(uintptr_t addr) override;" << std::endl;
   ofs << "\tuintptr_t address_resolve(uint32_t addr) override;" << std::endl;
   ofs << "};" << std::endl << std::endl;
 
-  ofs << "void eval(ExecutionState& ps, uint32_t address);" << std::endl
+  ofs << "void eval(ProgramState& ps, uint32_t address);" << std::endl
       << std::endl;
 
   ofs << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl << std::endl;
 
   for (auto &functions : _funs_exports) {
     ofs << "void internal_" << symbol_name_map(functions.second.name)
-        << "(ExecutionState& ps);" << std::endl;
+        << "(ProgramState& ps);" << std::endl;
   }
 
   ofs << std::endl
@@ -170,7 +170,7 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
     }
 
     ofs << "void external_" << symbol_name_map(functions.second.name)
-        << "(ExecutionState& ps);" << std::endl;
+        << "(ProgramState& ps);" << std::endl;
   }
 }
 
@@ -202,7 +202,7 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
   emit_code_address_mappings(ofs);
   emit_code_stubs(ofs);
 
-  ofs << "void eval(ExecutionState& ps, uint32_t address) {" << std::endl;
+  ofs << "void eval(ProgramState& ps, uint32_t address) {" << std::endl;
   ofs << "__start__:" << std::endl;
   ofs << "\tswitch(address) {" << std::endl;
 
@@ -357,18 +357,15 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
 }
 
 void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
-  ofs << "inline uint32_t ExecutionState::address_map(uintptr_t addr) {"
+  ofs << "inline uint32_t ProgramState::address_map(uintptr_t addr) {"
       << std::endl;
 
-  // stack first because most most frequent access
-  ofs << "\tif(addr >= reinterpret_cast<uintptr_t>(stack) && addr < "
-         "reinterpret_cast<uintptr_t>(stack) + "
-         "LIBLAYER_STACK_SIZE) {"
-      << std::endl;
-  ofs << "\t\treturn LIBLAYER_STACK_BASE + static_cast<uint32_t>("
-      << "addr - reinterpret_cast<uintptr_t>(stack));" << std::endl;
+  ofs << std::hex;
 
-  ofs << "\t}" << std::endl;
+  ofs << "\tuint32_t mapped;" << std::endl;
+  ofs << "\tif((mapped = ExecutionState::address_map(addr))) { return mapped; }"
+      << std::endl
+      << std::endl;
 
   for (auto &section : _elf.sections) {
     if (!section_is_data(section.get())) {
@@ -378,7 +375,6 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
     auto name = symbol_name_map(section->get_name());
     std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-    ofs << std::hex;
     ofs << "\tif(addr >= reinterpret_cast<uintptr_t>(g_" << name << "_DATA)"
         << " && addr < reinterpret_cast<uintptr_t>(g_" << name << "_DATA) + "
         << name << "_SIZE) {" << std::endl;
@@ -392,20 +388,14 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
 
   ofs << "}" << std::endl << std::endl;
 
-  ofs << "inline uintptr_t ExecutionState::address_resolve(uint32_t addr) {"
+  ofs << "inline uintptr_t ProgramState::address_resolve(uint32_t addr) {"
       << std::endl;
 
-  ofs << std::hex;
-
-  // stack first because most most frequent access
-  ofs << "\tif(addr >= LIBLAYER_STACK_BASE && addr < LIBLAYER_STACK_BASE + "
-         "LIBLAYER_STACK_SIZE) {"
+  ofs << "\tuintptr_t mapped;" << std::endl;
+  ofs << "\tif((mapped = ExecutionState::address_resolve(addr))) { return "
+         "mapped; }"
+      << std::endl
       << std::endl;
-  ofs << "\t\treturn reinterpret_cast<uintptr_t>(&stack[addr - "
-         "LIBLAYER_STACK_BASE]);"
-      << std::endl;
-
-  ofs << "\t}" << std::endl;
 
   for (auto &section : _elf.sections) {
     if (!section_is_data(section.get())) {
@@ -437,7 +427,7 @@ void Recompiler::emit_code_stubs(std::ofstream &ofs) {
 
   for (auto &functions : _funs_exports) {
     ofs << "__attribute__((weak)) void internal_"
-        << symbol_name_map(functions.second.name) << "(ExecutionState& ps) {"
+        << symbol_name_map(functions.second.name) << "(ProgramState& ps) {"
         << std::endl;
 
     // We need to set LR to INSTR_RETURN_LR for functions to return back
@@ -461,7 +451,7 @@ void Recompiler::emit_code_stubs(std::ofstream &ofs) {
     }
 
     ofs << "__attribute__((weak)) void external_" << functions.second.name
-        << "(ExecutionState& ps) {" << std::endl;
+        << "(ProgramState& ps) {" << std::endl;
     ofs << "\tstd::cout << \"stub: " << symbol_name_map(functions.second.name)
         << "\" << std::endl;" << std::endl;
     ofs << "}" << std::endl << std::endl;

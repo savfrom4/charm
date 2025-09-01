@@ -7,8 +7,8 @@
 #include <ostream>
 
 namespace charm::arm {
-using addr_t = uint32_t;
-using instr_t = uint32_t;
+typedef uint32_t addr_t;
+typedef uint32_t instr_t;
 
 // r0-15
 enum class Register : uint8_t {
