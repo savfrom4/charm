@@ -45,7 +45,7 @@ private:
     char buffer[512] = {0};
     snprintf(buffer, 512, fmt, args...);
 
-    os << std::hex << "throw std::runtime_error(\"" << buffer << " (addr = 0x "
+    os << std::hex << "throw std::runtime_error(\"" << buffer << " (addr = 0x"
        << address << ", raw=0x" << instr.raw << ")\")";
   }
 
