@@ -1,3 +1,8 @@
+// ----------- WARNING ! -------------
+// This emulator is only used internaly to parse plt table.
+// In the future it could be a standalone emulator, however for now it is not.
+// -----------------------------------
+
 #pragma once
 #include "elfio/elfio.hpp"
 #include "libcharm/arm.hpp"
@@ -20,11 +25,11 @@ class Emulator {
 public:
   EmulationState ps;
 
-  Emulator(ELFIO::elfio *elf, uint32_t address = 0);
+  Emulator(ELFIO::elfio *elf, arm::addr_t address = 0);
 
   bool step(arm::Instruction &instr);
 
-  inline void set_address(uint32_t addr) {
+  inline void set_address(arm::addr_t addr) {
     ps.r[(int)arm::Register::PC] = addr + 8;
   }
 

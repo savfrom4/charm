@@ -112,15 +112,22 @@ void dump_instructions(std::ofstream &ofs, ELFIO::section *section) {
       << section->get_address() << std::dec << ", size " << section->get_size()
       << "):" << std::endl;
 
-  const uint32_t *instrs =
-      reinterpret_cast<const uint32_t *>(section->get_data());
-  size_t instr_count = section->get_size() / sizeof(uint32_t);
+  // TODO: handle THUMB
 
-  for (size_t i = 0; i < instr_count; i++) {
-    ofs << "\t0x" << std::hex << section->get_address() + i * sizeof(uint32_t)
-        << ": " << std::dec;
+  const char *data = section->get_data();
+  size_t data_size = section->get_size() / sizeof(charm::arm::instr_t);
 
-    charm::arm::Instruction::decode(instrs[i]).dump(ofs);
+  for (charm::arm::addr_t i = 0; i < data_size;
+       i += sizeof(charm::arm::instr_t)) {
+    charm::arm::instr_t instr_raw;
+    memcpy(&instr_raw, data + i, sizeof(charm::arm::instr_t));
+
+    ofs << "\t0x" << std::hex
+        << section->get_address() + i * sizeof(charm::arm::instr_t) << ": "
+        << std::dec;
+
+    auto instr = charm::arm::Instruction::decode(instr_raw);
+    instr.dump(ofs);
     ofs << std::endl;
   }
 

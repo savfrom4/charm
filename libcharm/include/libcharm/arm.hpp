@@ -7,6 +7,8 @@
 #include <ostream>
 
 namespace charm::arm {
+using addr_t = uint32_t;
+using instr_t = uint32_t;
 
 // r0-15
 enum class Register : uint8_t {
@@ -197,24 +199,26 @@ public:
       Register rn;
       uint16_t reg_list;
     } blk_data_trans;
+
+    arm::instr_t raw;
   };
 
-  static Instruction decode(uint32_t instr);
+  static Instruction decode(instr_t instr);
   void dump(std::ostream &str);
 
 private:
-  void decode_data_processing(uint32_t instr);
-  void decode_multiply(uint32_t instr);
-  void decode_multiply_long(uint32_t instr);
-  void decode_single_data_transfer(uint32_t instr);
-  void decode_single_data_swap(uint32_t instr);
-  void decode_branch(uint32_t instr);
-  void decode_branchex(uint32_t instr);
-  void decode_block_data_transfer(uint32_t instr);
-  void decode_halfword_data_transfer(uint32_t instr, bool imm);
-  void decode_swi(uint32_t instr);
+  void decode_data_processing(instr_t instr);
+  void decode_multiply(instr_t instr);
+  void decode_multiply_long(instr_t instr);
+  void decode_single_data_transfer(instr_t instr);
+  void decode_single_data_swap(instr_t instr);
+  void decode_branch(instr_t instr);
+  void decode_branchex(instr_t instr);
+  void decode_block_data_transfer(instr_t instr);
+  void decode_halfword_data_transfer(instr_t instr, bool imm);
+  void decode_swi(instr_t instr);
 
-  void decode_shift(uint32_t instr, Shifter &shift);
+  void decode_shift(instr_t instr, Shifter &shift);
 };
 
 } // namespace charm::arm

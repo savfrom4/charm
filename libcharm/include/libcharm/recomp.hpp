@@ -9,7 +9,7 @@ namespace charm::recomp {
 
 struct Function {
   std::string name;
-  uintptr_t address;
+  arm::addr_t address;
   bool is_external;
 };
 
@@ -36,16 +36,27 @@ private:
   void emit_code_address_mappings(std::ofstream &ofs);
   void emit_code_stubs(std::ofstream &ofs);
   void emit_code_section(std::ofstream &ofs, const ELFIO::section *section);
-  void emit_code_arm(std::ostream &os, arm::Instruction &instr, uintptr_t addr);
+  void emit_code_arm(std::ostream &os, const arm::Instruction &instr,
+                     arm::addr_t address);
+
+  template <typename... Args>
+  void emit_code_invalid(std::ostream &os, const arm::Instruction &instr,
+                         arm::addr_t address, const char *fmt, Args... args) {
+    char buffer[512] = {0};
+    snprintf(buffer, 512, fmt, args...);
+
+    os << std::hex << "throw std::runtime_error(\"" << buffer << " (addr = 0x "
+       << address << ", raw=0x" << instr.raw << ")\")";
+  }
 
   bool _minify;
   ELFIO::elfio _elf;
   ELFIO::section *_text, *_plt, *_relplt, *_reldyn, *_dynsym;
 
-  std::vector<std::tuple<uintptr_t, uintptr_t>> _got_mappings;
-  std::unordered_map<uintptr_t, Function> _funs_deps;
-  std::unordered_map<uintptr_t, Function> _funs_exports;
-  std::unordered_map<uintptr_t, Function *> _fun_deps_mapped;
+  std::vector<std::tuple<arm::addr_t, arm::addr_t>> _got_mappings;
+  std::unordered_map<arm::addr_t, Function> _funs_deps;
+  std::unordered_map<arm::addr_t, Function> _funs_exports;
+  std::unordered_map<arm::addr_t, Function *> _fun_deps_mapped;
 };
 
 } // namespace charm::recomp

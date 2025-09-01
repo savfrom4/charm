@@ -1,3 +1,7 @@
+// ----------- WARNING ! -------------
+// This emulator is only used internaly to parse plt table.
+// In the future it could be a standalone emulator, however for now it is not.
+// -----------------------------------
 #define LIBLAYER_IMPL
 #include <liblayer/liblayer.hpp>
 
@@ -55,7 +59,7 @@ inline uintptr_t EmulationState::address_resolve(uint32_t addr) {
   throw std::runtime_error(ss.str());
 }
 
-Emulator::Emulator(ELFIO::elfio *elf, uint32_t address) {
+Emulator::Emulator(ELFIO::elfio *elf, arm::addr_t address) {
   ps._elf = elf;
   set_address(address);
 }
@@ -68,9 +72,9 @@ bool Emulator::step(arm::Instruction &instr) {
     return false;
   }
 
-  uint32_t raw_instr;
-  memcpy(&raw_instr, instr_addr, sizeof(uint32_t));
-  ps.r[(int)arm::Register::PC] += sizeof(uint32_t);
+  arm::instr_t raw_instr;
+  memcpy(&raw_instr, instr_addr, sizeof(arm::instr_t));
+  ps.r[(int)arm::Register::PC] += sizeof(arm::instr_t);
 
   instr = arm::Instruction::decode(raw_instr);
   if (!arm_check_cond(instr))
@@ -94,18 +98,6 @@ bool Emulator::step(arm::Instruction &instr) {
     }
     break;
 
-  case arm::InstructionGroup::MULTIPLY_LONG:
-    break;
-
-  case arm::InstructionGroup::SINGLE_DATA_SWAP:
-    break;
-
-  case arm::InstructionGroup::BRANCH_EXCHANGE:
-    break;
-
-  case arm::InstructionGroup::HALFWORD_DATA_TRANSFER:
-    break;
-
   /* Load / Store */
   case arm::InstructionGroup::SINGLE_DATA_TRANSFER: {
     if (!instr.data_trans.load) {
@@ -127,13 +119,7 @@ bool Emulator::step(arm::Instruction &instr) {
     break;
   }
 
-  case arm::InstructionGroup::BLOCK_DATA_TRANSFER:
-    break;
-
-  case arm::InstructionGroup::BRANCH:
-    break;
-
-  case arm::InstructionGroup::SWI:
+  default:
     break;
 
   case arm::InstructionGroup::INVALID:

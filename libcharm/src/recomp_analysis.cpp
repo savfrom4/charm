@@ -1,7 +1,6 @@
 #include "libcharm/arm.hpp"
 #include "libcharm/emulator.hpp"
 #include "libcharm/recomp.hpp"
-#include <cstdint>
 #include <exception>
 #include <ostream>
 #include <sstream>
@@ -98,7 +97,7 @@ void Recompiler::analyze_reloc_plt() {
 
       _funs_deps[offset] = Function{
           .name = ss.str(),
-          .address = static_cast<uintptr_t>(offset),
+          .address = static_cast<arm::addr_t>(offset),
           .is_external = true,
       };
       continue;
@@ -111,8 +110,9 @@ void Recompiler::analyze_reloc_plt() {
 
     _funs_deps[offset] = Function{
         .name = name, // TODO: multiple entries can have the same name!
-        .address = value != 0 ? static_cast<uintptr_t>(value) // virtual address
-                              : static_cast<uintptr_t>(offset), // .got offset
+        .address = value != 0
+                       ? static_cast<arm::addr_t>(value)   // virtual address
+                       : static_cast<arm::addr_t>(offset), // .got offset
         .is_external = !value,
     };
   }
@@ -149,7 +149,7 @@ void Recompiler::analyze_exported_functions() {
 
     _funs_exports[value] = Function{
         .name = name, // TODO: multiple entries can have the same name!
-        .address = static_cast<uintptr_t>(value),
+        .address = static_cast<arm::addr_t>(value),
         .is_external = false,
     };
   }
@@ -161,10 +161,10 @@ void Recompiler::analyze_exported_functions() {
 // that we collected before.
 void Recompiler::analyze_map_plt_to_reloc() {
   std::cout << "> Mapping plt to reloc table ..." << std::endl;
-  Emulator emu{&_elf, static_cast<uint32_t>(_plt->get_address())};
+  Emulator emu{&_elf, static_cast<arm::addr_t>(_plt->get_address())};
 
   try {
-    uintptr_t start = _plt->get_address(); // Start of the block
+    arm::addr_t start = _plt->get_address(); // Start of the block
     arm::Instruction instr;
 
     while (emu.step(instr)) {
@@ -173,14 +173,14 @@ void Recompiler::analyze_map_plt_to_reloc() {
         continue;
       }
 
-      uint32_t result = emu.ps.r[(int)instr.data_trans.rn] - 4;
+      arm::instr_t result = emu.ps.r[(int)instr.data_trans.rn] - 4;
       if (!_funs_deps.count(result)) {
         continue;
       }
 
-      uintptr_t end = emu.ps.r[(int)arm::Register::PC] - 8;
+      arm::addr_t end = emu.ps.r[(int)arm::Register::PC] - 8;
 
-      for (uintptr_t i = start; i < end; i++) {
+      for (arm::addr_t i = start; i < end; i++) {
         _fun_deps_mapped[i] = &_funs_deps[result];
       }
 

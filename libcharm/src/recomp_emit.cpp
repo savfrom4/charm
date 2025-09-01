@@ -314,7 +314,7 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
       ofs << name << "_DATA[" << section->get_size() << "] = {" << std::endl;
 
       ss << "\t";
-      for (size_t i = 0; i < section->get_size(); i++) {
+      for (charm::arm::addr_t i = 0; i < section->get_size(); i++) {
         ss << (data ? static_cast<int>(data[i]) : 0) << ", ";
 
         if (i % 8 == 7) {
@@ -326,17 +326,18 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
       ofs << ((section->get_flags() & ELFIO::SHF_WRITE) ? "uint32_t g_"
                                                         : "const uint32_t g_");
 
-      ofs << name << "_DATA[" << (section->get_size() / sizeof(uint32_t))
+      ofs << name << "_DATA[" << (section->get_size() / sizeof(arm::instr_t))
           << "] = {" << std::endl;
 
       ss << std::hex;
 
       // map addresses
-      for (size_t i = 0; i < section->get_size(); i += sizeof(uint32_t)) {
-        uintptr_t mapped_address = 0;
+      for (arm::addr_t i = 0; i < section->get_size();
+           i += sizeof(arm::instr_t)) {
+        arm::addr_t mapped_address = 0;
 
         for (auto &mapping : _got_mappings) {
-          uintptr_t offset = std::get<0>(mapping) - section->get_address();
+          arm::addr_t offset = std::get<0>(mapping) - section->get_address();
           if (offset != i) {
             continue;
           }
@@ -489,13 +490,13 @@ void Recompiler::emit_code_section(std::ofstream &ofs,
   std::stringstream ss;
 
   // actual emit
-  for (size_t i = 0; i < data_size; i += sizeof(uint32_t)) {
-    uintptr_t addr = section->get_address() + i;
+  for (arm::addr_t i = 0; i < data_size; i += sizeof(arm::instr_t)) {
+    arm::addr_t addr = static_cast<arm::addr_t>(section->get_address() + i);
 
     ss << std::hex << "\tINSTR(0x" << addr << ") {" << std::dec << std::endl;
 
-    uint32_t instr_raw;
-    memcpy(&instr_raw, data + i, sizeof(uint32_t));
+    arm::instr_t instr_raw;
+    memcpy(&instr_raw, data + i, sizeof(arm::instr_t));
     auto instr = arm::Instruction::decode(instr_raw);
 
     // debug information for instruction debugging
@@ -528,8 +529,8 @@ void Recompiler::emit_code_section(std::ofstream &ofs,
   }
 }
 
-void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
-                               uintptr_t address) {
+void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
+                               arm::addr_t address) {
   if (instr.group == arm::InstructionGroup::INVALID) {
     if (_minify) {
       os << "\t\t__builtin_unreachable();";
@@ -599,21 +600,22 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
          << std::dec << MINIFY_COMMENT(" /* amount */") << "));";
     }
 
+    // what if instruction tries to modify PC ?
+    if (instr.data.rd != arm::Register::PC) {
+      break;
+    }
+
     switch (instr.data.op) {
     case arm::Opcode::TST:
     case arm::Opcode::TEQ:
     case arm::Opcode::CMP:
     case arm::Opcode::CMN:
-    case arm::Opcode::BIC:
     case arm::Opcode::COUNT:
     case arm::Opcode::INVALID:
+      // these instructions can't modify PC
       break;
 
     default: {
-      if (instr.data.rd != arm::Register::PC) {
-        break;
-      }
-
       os << " address = " << std::hex << "ps.r[" << REGISTER_TABLE[REG_PC]
          << "]; goto __start__;";
 
@@ -668,7 +670,7 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
     uint32_t final_offset = (int64_t)(address + 8) + instr.branch.offset;
     Function *mapped = nullptr;
 
-    // check if maybe we are calling external fn
+    // maybe we are calling external fn
     if (_fun_deps_mapped.count(final_offset)) {
       mapped = _fun_deps_mapped[final_offset];
 
@@ -701,8 +703,9 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
     }
 
     if (!found_section) {
-      os << "throw std::runtime_error(\"Invald b/bl address: 0x" << std::hex
-         << final_offset << std::dec << "\")";
+      emit_code_invalid(os, instr, address,
+                        "Attempt to branch to an invalid address: 0x%x",
+                        final_offset);
       break;
     }
 
@@ -727,9 +730,7 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
     break;
 
   case arm::InstructionGroup::SINGLE_DATA_SWAP:
-    os << "throw "
-          "std::runtime_error(\"SINGLE_DATA_SWAP instruction at 0x"
-       << std::hex << address << std::dec << "\")";
+    emit_code_invalid(os, instr, address, "SWI is not implemented.");
     break;
 
   case arm::InstructionGroup::SINGLE_DATA_TRANSFER:
@@ -861,11 +862,12 @@ void Recompiler::emit_code_arm(std::ostream &os, arm::Instruction &instr,
     break;
 
   case arm::InstructionGroup::SWI:
-    os << MINIFY_COMMENT("/* swi */");
+    emit_code_invalid(os, instr, address, "SWI is not implemented.");
     break;
 
   default:
-    __builtin_unreachable();
+    emit_code_invalid(os, instr, address, "Invalid instruction.");
+    break;
   }
 
   os << ");" << std::endl;

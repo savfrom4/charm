@@ -203,5 +203,5 @@ public:
   }
 
 #ifdef LIBLAYER_IMPL
-#include "armv4t_arm.cpp" // ARMv4T (ARM instructions)
+#include "armv4.cpp" // ARMv4T (ARM instructions)
 #endif

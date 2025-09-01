@@ -38,8 +38,9 @@ template <uint32_t bits> inline int32_t sign_extend(uint32_t value) {
 }
 
 namespace charm::arm {
-Instruction Instruction::decode(uint32_t instr) {
+Instruction Instruction::decode(instr_t instr) {
   Instruction info;
+  info.raw = instr;
   info.cond = static_cast<Condition>(get_bits<28, 4>(instr));
 
   switch (get_bits<26, 2>(instr)) {
@@ -125,7 +126,7 @@ Instruction Instruction::decode(uint32_t instr) {
 }
 
 // 4.5 Data Processing
-inline void Instruction::decode_data_processing(uint32_t instr) {
+inline void Instruction::decode_data_processing(instr_t instr) {
   group = InstructionGroup::DATA_PROCESSING;
 
   is_imm = get_bits<25>(instr); /* Immediate, bit 25 */
@@ -154,7 +155,7 @@ inline void Instruction::decode_data_processing(uint32_t instr) {
 }
 
 // 4.7 Multiply and Multiply-Accumulate (MUL, MLA)
-inline void Instruction::decode_multiply(uint32_t instr) {
+inline void Instruction::decode_multiply(instr_t instr) {
   group = InstructionGroup::MULTIPLY;
 
   mul.accumulate = get_bits<21>(instr); /* Accumulate, bit 21 */
@@ -171,7 +172,7 @@ inline void Instruction::decode_multiply(uint32_t instr) {
 }
 
 // 4.8 Multiply Long and Multiply-Accumulate Long (MULL,MLAL)
-inline void Instruction::decode_multiply_long(uint32_t instr) {
+inline void Instruction::decode_multiply_long(instr_t instr) {
   group = InstructionGroup::MULTIPLY_LONG;
 
   mul_long.sign = get_bits<22>(instr);       /* Unsigned, bit 22 */
@@ -189,7 +190,7 @@ inline void Instruction::decode_multiply_long(uint32_t instr) {
 }
 
 // 4.9 Single Data Transfer (LDR, STR)
-inline void Instruction::decode_single_data_transfer(uint32_t instr) {
+inline void Instruction::decode_single_data_transfer(instr_t instr) {
   group = InstructionGroup::SINGLE_DATA_TRANSFER;
 
   is_imm = !get_bits<25>(instr);               /* Immediate, bit 25 */
@@ -213,7 +214,7 @@ inline void Instruction::decode_single_data_transfer(uint32_t instr) {
 }
 
 // 4.12 Single Data Swap (SWP)
-inline void Instruction::decode_single_data_swap(uint32_t instr) {
+inline void Instruction::decode_single_data_swap(instr_t instr) {
   group = InstructionGroup::SINGLE_DATA_SWAP;
 
   data_swap.byte = get_bits<22>(instr); /* Byte/Word, bit 22  */
@@ -227,7 +228,7 @@ inline void Instruction::decode_single_data_swap(uint32_t instr) {
 }
 
 // 4.4 Branch and Branch with Link (B, BL)
-inline void Instruction::decode_branch(uint32_t instr) {
+inline void Instruction::decode_branch(instr_t instr) {
   group = InstructionGroup::BRANCH;
 
   branch.link = get_bits<24>(instr);            /* Link, bit 24 */
@@ -237,14 +238,14 @@ inline void Instruction::decode_branch(uint32_t instr) {
 }
 
 // 4.3 Branch and Exchange (BX)
-inline void Instruction::decode_branchex(uint32_t instr) {
+inline void Instruction::decode_branchex(instr_t instr) {
   group = InstructionGroup::BRANCH_EXCHANGE;
 
   branchex.rm = static_cast<Register>(get_bits<0, 4>(instr)); /* Rn, bit 24 */
 }
 
 // 4.11 Block Data Transfer (LDM, STM)
-inline void Instruction::decode_block_data_transfer(uint32_t instr) {
+inline void Instruction::decode_block_data_transfer(instr_t instr) {
   group = InstructionGroup::BLOCK_DATA_TRANSFER;
 
   blk_data_trans.pre_indx = get_bits<24>(instr); /* Pre/Post indexing, bit 24 */
@@ -259,7 +260,7 @@ inline void Instruction::decode_block_data_transfer(uint32_t instr) {
 }
 
 // 4.10 Halfword and Signed Data Transfer
-inline void Instruction::decode_halfword_data_transfer(uint32_t instr,
+inline void Instruction::decode_halfword_data_transfer(instr_t instr,
                                                        bool imm) {
   group = InstructionGroup::HALFWORD_DATA_TRANSFER;
 
@@ -291,14 +292,14 @@ inline void Instruction::decode_halfword_data_transfer(uint32_t instr,
 }
 
 // 4.13 Software Interrupt (SWI)
-inline void Instruction::decode_swi(uint32_t instr) {
+inline void Instruction::decode_swi(instr_t instr) {
   group = InstructionGroup::SWI;
 
   /* we dont have to parse comment field */
 }
 
 // 4.5.2 Shifts
-inline void Instruction::decode_shift(uint32_t instr, Shifter &shift) {
+inline void Instruction::decode_shift(instr_t instr, Shifter &shift) {
   shift.type = static_cast<ShifterType>(get_bits<5, 2>(instr));
 
   shift.is_reg = get_bits<4>(instr); /* Shift register should be used, bit 4 */
