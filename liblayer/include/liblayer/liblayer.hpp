@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 
 #ifndef LIBLAYER_STACK_BASE
 #define LIBLAYER_STACK_BASE (0xC0000000) // Virtual address of stack pointer
@@ -54,6 +55,9 @@ enum {
 };
 
 class ExecutionState {
+private:
+  std::mutex memory_mutex;
+
 public:
   reg_value_t r[REG_COUNT] = {
       0, 0,
@@ -74,10 +78,7 @@ public:
   uint8_t stack[LIBLAYER_STACK_SIZE] = {0}; /* stack */
   uint8_t *memory = nullptr;                /* memory */
 
-  inline ExecutionState() {
-    memory = new uint8_t[LIBLAYER_MEMORY_SIZE];
-    memset(memory, 0, LIBLAYER_MEMORY_SIZE);
-  }
+  inline ExecutionState() { memory_init(); }
 
   inline ~ExecutionState() { delete[] memory; }
 
@@ -86,8 +87,9 @@ public:
 
   // Allocations
 
-  virtual void *alloc(uint32_t size);
-  virtual void free(void *p);
+  void memory_init();
+  void *memory_alloc(uint32_t size);
+  void memory_free(void *p);
 
   // armv4
 
