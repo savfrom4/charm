@@ -8,7 +8,7 @@
 #endif
 
 #ifndef LIBLAYER_STACK_SIZE
-#define LIBLAYER_STACK_SIZE (1024 * 1024) // Size of the stack (1 MB)
+#define LIBLAYER_STACK_SIZE (1024 * 1024 * 4) // Size of the stack (4 MB)
 #endif
 
 #ifndef LIBLAYER_MEMORY_BASE
@@ -20,6 +20,7 @@
 #endif
 
 #ifdef LIBLAYER_DEBUG
+#include <iostream>
 #define DEBUG_LOG(fmt, ...)                                                    \
   do {                                                                         \
     std::cout << fmt << std::endl;                                             \
@@ -78,7 +79,10 @@ public:
   uint8_t stack[LIBLAYER_STACK_SIZE] = {0}; /* stack */
   uint8_t *memory = nullptr;                /* memory */
 
-  inline ExecutionState() { memory_init(); }
+  inline ExecutionState() {
+    memory = new uint8_t[LIBLAYER_MEMORY_SIZE];
+    memory_init();
+  }
 
   inline ~ExecutionState() { delete[] memory; }
 

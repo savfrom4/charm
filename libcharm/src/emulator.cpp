@@ -2,6 +2,7 @@
 // This emulator is only used internaly to parse plt table.
 // In the future it could be a standalone emulator, however for now it is not.
 // -----------------------------------
+#include <exception>
 #define LIBLAYER_IMPL
 #include <liblayer/liblayer.hpp>
 
@@ -65,20 +66,23 @@ Emulator::Emulator(ELFIO::elfio *elf, arm::addr_t address) {
 }
 
 bool Emulator::step(arm::Instruction &instr) {
-  const char *instr_addr = reinterpret_cast<const char *>(
-      ps.address_resolve(ps.r[(int)arm::Register::PC] - 8));
+  const char *instr_addr;
 
-  if (!instr_addr) {
+  try {
+    instr_addr = reinterpret_cast<const char *>(
+        ps.address_resolve(ps.r[(int)arm::Register::PC] - 8));
+  } catch (std::exception &e) {
     return false;
   }
 
   arm::instr_t raw_instr;
   memcpy(&raw_instr, instr_addr, sizeof(arm::instr_t));
-  ps.r[(int)arm::Register::PC] += sizeof(arm::instr_t);
 
   instr = arm::Instruction::decode(raw_instr);
-  if (!arm_check_cond(instr))
+  if (!arm_check_cond(instr)) {
+    ps.r[(int)arm::Register::PC] += sizeof(arm::instr_t);
     return true;
+  }
 
   switch (instr.group) {
   case arm::InstructionGroup::DATA_PROCESSING: {
@@ -126,6 +130,7 @@ bool Emulator::step(arm::Instruction &instr) {
     throw std::runtime_error("Invalid instruction");
   }
 
+  ps.r[(int)arm::Register::PC] += sizeof(arm::instr_t);
   return true;
 }
 

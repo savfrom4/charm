@@ -315,7 +315,7 @@ inline void ExecutionState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  DEBUG_LOG("arm_mul: after r" << static_cast<int>(rd) << "=" < < < r[rd]);
+  DEBUG_LOG("arm_mul: after r" << static_cast<int>(rd) << "=" << r[rd]);
 }
 
 inline void ExecutionState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
@@ -415,12 +415,17 @@ inline void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
   if (copy) {
     const void *mem = reinterpret_cast<const void *>(address_resolve(addr));
 
+    if (UNLIKELY(!mem)) {
+      throw std::runtime_error("arm_ldr: access 0x00000000");
+    }
+
     if (byte) {
       memset(&r[rd], 0, sizeof(reg_value_t));
       memcpy(&r[rd], mem, sizeof(uint8_t));
     } else {
       memcpy(&r[rd], mem, sizeof(uint32_t));
     }
+
     DEBUG_LOG("arm_ldr: read value=0x" << std::hex << r[rd] << std::dec);
   }
 
@@ -460,6 +465,10 @@ inline void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
   if (copy) {
     void *mem = reinterpret_cast<void *>(address_resolve(addr));
 
+    if (UNLIKELY(!mem)) {
+      throw std::runtime_error("arm_str: access 0x00000000");
+    }
+
     if (byte) {
       memcpy(mem, &value, sizeof(uint8_t));
       DEBUG_LOG("arm_str: wrote value=0x"
@@ -497,6 +506,10 @@ inline void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
                           << ", addr=0x" << std::hex << addr << std::dec);
 
   const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
+
+  if (UNLIKELY(!mem)) {
+    throw std::runtime_error("arm_ldrh: access 0x00000000");
+  }
 
   switch (type) {
   case 0b00:
@@ -565,6 +578,10 @@ inline void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
 
   char *mem = reinterpret_cast<char *>(address_resolve(addr));
 
+  if (UNLIKELY(!mem)) {
+    throw std::runtime_error("arm_stmh: access 0x00000000");
+  }
+
   switch (type) {
   case 0b00:
     throw std::runtime_error("arm_stmh: SWP unimplemented!");
@@ -631,6 +648,11 @@ inline void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
 
   if (copy) {
     const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
+
+    if (UNLIKELY(!mem)) {
+      throw std::runtime_error("arm_ldm: access 0x00000000");
+    }
+
     for (reg_value_t i = 0; i < REG_COUNT; i++) {
       if (!((reg_list >> i) & 1)) {
         continue;
@@ -668,6 +690,10 @@ inline void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
   if (copy) {
     char *mem = reinterpret_cast<char *>(address_resolve(addr));
     bool written = false;
+
+    if (UNLIKELY(!mem)) {
+      throw std::runtime_error("arm_stm: access 0x00000000");
+    }
 
     for (reg_value_t i = 0; i < REG_COUNT; i++) {
       if (!((reg_list >> i) & 1)) {

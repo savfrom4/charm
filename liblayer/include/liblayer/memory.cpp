@@ -1,9 +1,11 @@
 #include "liblayer.hpp"
 #include <cstring>
+#include <iostream>
 #include <mutex>
+#include <ostream>
 
-#define BLOCK_SIZE (64) // Min allocation + sizeof(Block)
-#define BLOCK_ITER (BLOCK_SIZE + sizeof(Block))
+#define BLOCK_SIZE (64)                         // Min allocation
+#define BLOCK_ITER (BLOCK_SIZE + sizeof(Block)) // + sizeof(Block)
 
 struct Block {
   bool allocated;
@@ -18,7 +20,7 @@ inline uint32_t ExecutionState::address_map(uintptr_t addr) {
   } else if (addr >= reinterpret_cast<uintptr_t>(memory) &&
              addr <
                  reinterpret_cast<uintptr_t>(memory) + LIBLAYER_MEMORY_SIZE) {
-    return LIBLAYER_STACK_SIZE +
+    return LIBLAYER_MEMORY_BASE +
            static_cast<uint32_t>(addr - reinterpret_cast<uintptr_t>(memory));
   }
 
@@ -31,18 +33,16 @@ inline uintptr_t ExecutionState::address_resolve(uint32_t addr) {
     return reinterpret_cast<uintptr_t>(&stack[addr - LIBLAYER_STACK_BASE]);
   } else if (addr >= LIBLAYER_MEMORY_BASE &&
              addr < LIBLAYER_MEMORY_BASE + LIBLAYER_MEMORY_SIZE) {
-    return reinterpret_cast<uintptr_t>(&stack[addr - LIBLAYER_MEMORY_BASE]);
+    return reinterpret_cast<uintptr_t>(&memory[addr - LIBLAYER_MEMORY_BASE]);
   }
 
   return 0;
 }
 
 void ExecutionState::memory_init() {
-  memory = new uint8_t[LIBLAYER_MEMORY_SIZE];
   memset(memory, 0, LIBLAYER_MEMORY_SIZE);
 
   const Block blk = {.allocated = false, .size = BLOCK_SIZE};
-
   for (uint32_t i = 0; i < LIBLAYER_MEMORY_SIZE; i += BLOCK_ITER) {
     // discard whats outside the range
     if (i + BLOCK_ITER >= LIBLAYER_MEMORY_SIZE) {
@@ -53,6 +53,8 @@ void ExecutionState::memory_init() {
   }
 }
 void *ExecutionState::memory_alloc(uint32_t size) {
+  std::cout << "malloc " << size << std::endl;
+
   if (!size) {
     return nullptr;
   }
@@ -103,9 +105,12 @@ void *ExecutionState::memory_alloc(uint32_t size) {
       Block next_blk;
       memcpy(&next_blk, next_blk_ptr, sizeof(next_blk));
 
-      // we hit a taken block, return
+      // we hit a taken block
       if (next_blk.allocated) {
-        break;
+        next_blk_ptr += next_blk.size + sizeof(Block);
+        accumulated_size = 0;
+        n = 0;
+        continue;
       }
 
       // hey maybe we reached our target!

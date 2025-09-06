@@ -87,26 +87,21 @@ void Recompiler::emit_makefile(const std::string &output_dir) {
 
   ofs << "CXX ?= c++" << std::endl;
   ofs << "OPT = -O2" << std::endl;
-  ofs << "CXXFLAGS = -Iliblayer/include -std=c++17 -flto -fPIC -w" << std::endl
+  ofs << "CXXFLAGS = -Iliblayer/include -std=c++17 -flto -fPIC -w $(MAKEOPT)"
+      << std::endl
       << std::endl;
 
   ofs << "SRCS = code.cpp data.cpp" << std::endl;
   ofs << "OBJS = $(SRCS:.cpp=.o)" << std::endl;
   ofs << "NAME = exec" << std::endl << std::endl;
 
-  ofs << "STACK_BASE ?= " << LIBLAYER_STACK_BASE << std::endl;
-  ofs << "STACK_SIZE ?= " << LIBLAYER_STACK_SIZE << std::endl;
-  ofs << "DEBUG ?= 0" << std::endl;
+  ofs << "RELEASE ?= 1" << std::endl;
   ofs << "SHARED ?= 0" << std::endl << std::endl;
 
-  ofs << "CXXFLAGS += -DLIBLAYER_STACK_BASE=$(STACK_BASE) \\" << std::endl
-      << "\t-DLIBLAYER_STACK_SIZE=$(STACK_SIZE)" << std::endl
-      << std::endl;
-
-  ofs << "ifeq ($(DEBUG),1)" << std::endl
-      << "\tCXXFLAGS += -g -DLIBLAYER_DEBUG" << std::endl
+  ofs << "ifeq ($(RELEASE),0)" << std::endl
+      << "\tCXXFLAGS += -g" << std::endl
       << "else" << std::endl
-      << "\tCXXFLAGS += $(OPT)" << std::endl
+      << "\tCXXFLAGS += -O3" << std::endl
       << "endif" << std::endl
       << std::endl;
 
@@ -142,7 +137,8 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
       << std::endl;
 
   ofs << "#pragma once" << std::endl;
-  ofs << "#include <liblayer/liblayer.hpp>" << std::endl << std::endl;
+  ofs << "#include <liblayer/liblayer.hpp>" << std::endl;
+  ofs << "#define INSTR_RETURN_LR (0xFFFFFFFF)" << std::endl << std::endl;
 
   ofs << "class ProgramState : public ExecutionState {" << std::endl;
   ofs << "public:" << std::endl;
@@ -191,7 +187,6 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
   ofs << "#include <liblayer/liblayer.hpp>" << std::endl;
   ofs << "#include \"code.hpp\"" << std::endl;
   ofs << "#include \"data.hpp\"" << std::endl << std::endl;
-  ofs << "#define INSTR_RETURN_LR (0xFFFFFFFF)" << std::endl;
   ofs << "#define INSTR(ADDR) case ADDR: a##ADDR: ps.r[REG_PC] = ADDR+8;"
       << std::endl;
 
@@ -383,7 +378,7 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
         << "addr - reinterpret_cast<uintptr_t>(g_" << name << "_DATA));"
         << std::endl;
 
-    ofs << std::dec << "\t}" << std::endl;
+    ofs << "\t}" << std::endl;
   }
 
   ofs << "}" << std::endl << std::endl;
@@ -434,7 +429,6 @@ void Recompiler::emit_code_stubs(std::ofstream &ofs) {
     // properly!
     ofs << "\tps.r[REG_LR] = INSTR_RETURN_LR;" << std::endl;
 
-    // Vinaly
     ofs << "\teval(ps, 0x" << std::hex << functions.second.address << std::dec
         << ");" << std::endl;
 
