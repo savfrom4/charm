@@ -172,42 +172,35 @@ void Recompiler::analyze_map_plt_to_reloc() {
   Emulator emu{&_elf, static_cast<arm::addr_t>(_plt->get_address())};
 
   arm::addr_t start = _plt->get_address(); // Start of the block
+  arm::addr_t section_end = _plt->get_address() + _plt->get_size();
   arm::Instruction instr;
 
-  while (1) {
-    try {
-      if (!emu.step(instr)) {
-        break;
-      }
-
-      if (instr.group != arm::InstructionGroup::SINGLE_DATA_TRANSFER ||
-          !instr.data_trans.load || instr.data_trans.rd != arm::Register::PC) {
-        continue;
-      }
-
-      arm::instr_t result = emu.ps.r[(int)instr.data_trans.rn];
-      arm::addr_t end = emu.ps.r[(int)arm::Register::PC] - 8;
-
-      std::cout << "calc " << std::hex << result << std::endl;
-      if (!_funs_deps.count(result)) {
-        start = end;
-        continue;
-      }
-
-      std::cout << "\t" << std::hex << _funs_deps[result].name
-                << " mapped to 0x" << start << "...0x" << end << std::dec
-                << std::endl;
-
-      for (arm::addr_t i = start; i < end; i++) {
-        _fun_deps_mapped[i] = &_funs_deps[result];
-      }
-
-      start = end;
-
-    } catch (std::exception &e) {
-      // TODO: hacky way, implement proper handling
-      emu.ps.r[(int)arm::Register::PC] += sizeof(arm::instr_t);
+  while (emu.ps.r[(int)arm::Register::PC] - 8 < section_end) {
+    if (!emu.step(instr)) {
+      break;
     }
+
+    if (instr.group != arm::InstructionGroup::SINGLE_DATA_TRANSFER ||
+        !instr.data_trans.load || instr.data_trans.rd != arm::Register::PC) {
+      continue;
+    }
+
+    arm::instr_t result = emu.ps.r[(int)instr.data_trans.rn];
+    arm::addr_t end = emu.ps.r[(int)arm::Register::PC] - 8;
+
+    if (!_funs_deps.count(result)) {
+      start = end;
+      continue;
+    }
+
+    std::cout << "\t" << std::hex << _funs_deps[result].name << " mapped to 0x "
+              << start << "...0x" << end << std::dec << std::endl;
+
+    for (arm::addr_t i = start; i < end; i++) {
+      _fun_deps_mapped[i] = &_funs_deps[result];
+    }
+
+    start = end;
   }
 
   std::cout << "\tMapped " << _fun_deps_mapped.size() << " ranges!"

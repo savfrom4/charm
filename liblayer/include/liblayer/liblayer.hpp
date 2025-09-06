@@ -16,7 +16,7 @@
 #endif
 
 #ifndef LIBLAYER_MEMORY_SIZE
-#define LIBLAYER_MEMORY_SIZE (1024 * 1024 * 16) // Size of the memory (16 MB)
+#define LIBLAYER_MEMORY_SIZE (1024 * 1024 * 64) // Size of the memory (16 MB)
 #endif
 
 #ifdef LIBLAYER_DEBUG

@@ -45,8 +45,7 @@ inline uintptr_t EmulationState::address_resolve(uint32_t addr) {
     }
 
     if (!section->get_data()) {
-      std::cout << "invalid section " << section->get_name() << std::endl;
-      return 0;
+      throw std::runtime_error(section->get_name());
     }
 
     uintptr_t offset = addr - static_cast<uint32_t>(section->get_address());
