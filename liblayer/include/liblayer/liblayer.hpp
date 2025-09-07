@@ -60,6 +60,8 @@ enum : reg_idx_t {
   REG_COUNT = 16,
 };
 
+struct Allocation {};
+
 class ExecutionState {
 public:
   bool cs, /* carry set */
