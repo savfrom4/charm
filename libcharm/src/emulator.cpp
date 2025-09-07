@@ -3,7 +3,7 @@
 // In the future it could be a standalone emulator, however for now it is not.
 // -----------------------------------
 #include <exception>
-#define LIBLAYER_IMPL
+#define LAYER_IMPLEMENTATION
 #include <liblayer/liblayer.hpp>
 
 #include "libcharm/arm.hpp"
@@ -13,11 +13,13 @@
 #include <sstream>
 #include <stdexcept>
 
+using namespace layer;
+
 namespace charm {
 
 reg_value_t shift(EmulationState &ps, charm::arm::Shifter shifter);
 
-inline uint32_t EmulationState::address_map(uintptr_t addr) {
+inline uint32_t EmulationState::memory_map(uintptr_t addr) {
   for (auto &section : _elf->sections) {
     if (addr < reinterpret_cast<uintptr_t>(section->get_data()) ||
         addr >= reinterpret_cast<uintptr_t>(section->get_data()) +
@@ -36,7 +38,7 @@ inline uint32_t EmulationState::address_map(uintptr_t addr) {
   throw std::runtime_error(ss.str());
 }
 
-inline uintptr_t EmulationState::address_resolve(uint32_t addr) {
+inline uintptr_t EmulationState::memory_resolve(uint32_t addr) {
   for (auto &section : _elf->sections) {
     if (addr < static_cast<uint32_t>(section->get_address()) ||
         addr >= static_cast<uint32_t>(section->get_address()) +
@@ -69,7 +71,7 @@ bool Emulator::step(arm::Instruction &instr) {
 
   try {
     instr_addr = reinterpret_cast<const char *>(
-        ps.address_resolve(ps.r[(int)arm::Register::PC] - 8));
+        ps.memory_resolve(ps.r[(int)arm::Register::PC] - 8));
   } catch (std::exception &e) {
     return false;
   }

@@ -1,8 +1,6 @@
 #include "liblayer.hpp"
 #include <cstring>
-#include <iostream>
 #include <mutex>
-#include <ostream>
 
 #define BLOCK_SIZE (64)                         // Min allocation
 #define BLOCK_ITER (BLOCK_SIZE + sizeof(Block)) // + sizeof(Block)
@@ -12,40 +10,49 @@ struct Block {
   uint32_t size;
 };
 
-inline uint32_t ExecutionState::address_map(uintptr_t addr) {
-  if (addr >= reinterpret_cast<uintptr_t>(stack) &&
-      addr < reinterpret_cast<uintptr_t>(stack) + LIBLAYER_STACK_SIZE) {
-    return LIBLAYER_STACK_BASE +
-           static_cast<uint32_t>(addr - reinterpret_cast<uintptr_t>(stack));
-  } else if (addr >= reinterpret_cast<uintptr_t>(memory) &&
-             addr <
-                 reinterpret_cast<uintptr_t>(memory) + LIBLAYER_MEMORY_SIZE) {
-    return LIBLAYER_MEMORY_BASE +
-           static_cast<uint32_t>(addr - reinterpret_cast<uintptr_t>(memory));
+namespace layer {
+
+inline uint32_t ExecutionState::memory_map(uintptr_t address) {
+  // stack
+  if (address >= reinterpret_cast<uintptr_t>(stack) &&
+      address < reinterpret_cast<uintptr_t>(stack) + LAYER_STACK_SIZE) {
+    return LAYER_STACK_BASE +
+           static_cast<uint32_t>(address - reinterpret_cast<uintptr_t>(stack));
+  }
+
+  // memory
+  else if (address >= reinterpret_cast<uintptr_t>(memory) &&
+           address < reinterpret_cast<uintptr_t>(memory) + LAYER_MEMORY_SIZE) {
+    return LAYER_MEMORY_BASE +
+           static_cast<uint32_t>(address - reinterpret_cast<uintptr_t>(memory));
   }
 
   return 0;
 }
 
-inline uintptr_t ExecutionState::address_resolve(uint32_t addr) {
-  if (addr >= LIBLAYER_STACK_BASE &&
-      addr < LIBLAYER_STACK_BASE + LIBLAYER_STACK_SIZE) {
-    return reinterpret_cast<uintptr_t>(&stack[addr - LIBLAYER_STACK_BASE]);
-  } else if (addr >= LIBLAYER_MEMORY_BASE &&
-             addr < LIBLAYER_MEMORY_BASE + LIBLAYER_MEMORY_SIZE) {
-    return reinterpret_cast<uintptr_t>(&memory[addr - LIBLAYER_MEMORY_BASE]);
+inline uintptr_t ExecutionState::memory_resolve(uint32_t address) {
+  // stack
+  if (address >= LAYER_STACK_BASE &&
+      address < LAYER_STACK_BASE + LAYER_STACK_SIZE) {
+    return reinterpret_cast<uintptr_t>(&stack[address - LAYER_STACK_BASE]);
+  }
+
+  // memory
+  else if (address >= LAYER_MEMORY_BASE &&
+           address < LAYER_MEMORY_BASE + LAYER_MEMORY_SIZE) {
+    return reinterpret_cast<uintptr_t>(&memory[address - LAYER_MEMORY_BASE]);
   }
 
   return 0;
 }
 
 void ExecutionState::memory_init() {
-  memset(memory, 0, LIBLAYER_MEMORY_SIZE);
+  memset(memory, 0, LAYER_MEMORY_SIZE);
 
   const Block blk = {.allocated = false, .size = BLOCK_SIZE};
-  for (uint32_t i = 0; i < LIBLAYER_MEMORY_SIZE; i += BLOCK_ITER) {
+  for (uint32_t i = 0; i < LAYER_MEMORY_SIZE; i += BLOCK_ITER) {
     // discard whats outside the range
-    if (i + BLOCK_ITER >= LIBLAYER_MEMORY_SIZE) {
+    if (i + BLOCK_ITER >= LAYER_MEMORY_SIZE) {
       break;
     }
 
@@ -63,7 +70,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
 
   // we iterate trying to find a free block
   uint8_t *ptr = memory;
-  uint8_t *end = memory + LIBLAYER_MEMORY_SIZE;
+  uint8_t *end = memory + LAYER_MEMORY_SIZE;
 
   while (ptr < end) {
     Block blk;
@@ -147,3 +154,5 @@ void ExecutionState::memory_free(void *p) {
   blk.allocated = false;
   memcpy(base, &blk, sizeof(Block));
 }
+
+} // namespace layer

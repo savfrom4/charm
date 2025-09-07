@@ -1,7 +1,6 @@
 #include "libcharm/arm.hpp"
 #include "libcharm/emulator.hpp"
 #include "libcharm/recomp.hpp"
-#include <exception>
 #include <ostream>
 #include <sstream>
 #include <tuple>

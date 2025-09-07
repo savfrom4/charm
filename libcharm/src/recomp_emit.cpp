@@ -1,7 +1,5 @@
-#include "elfio/elf_types.hpp"
 #include "libcharm/arm.hpp"
 #include "libcharm/recomp.hpp"
-#include "liblayer/liblayer.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -24,9 +22,8 @@ const std::array<std::string, (int)charm::arm::Opcode::COUNT> OPCODE_TABLE = {
 
 const std::array<std::string, (int)charm::arm::Register::COUNT> REGISTER_TABLE =
     {
-        "REG_R0",  "REG_R1", "REG_R2", "REG_R3", "REG_R4",  "REG_R5",
-        "REG_R6",  "REG_R7", "REG_R8", "REG_R9", "REG_R10", "REG_R11",
-        "REG_R12", "REG_SP", "REG_LR", "REG_PC",
+        "R0", "R1", "R2",  "R3",  "R4",  "R5", "R6", "R7",
+        "R8", "R9", "R10", "R11", "R12", "SP", "LR", "PC",
 };
 
 const std::array<std::string, (int)charm::arm::Condition::COUNT> COND_TABLE = {
@@ -140,10 +137,10 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
   ofs << "#include <liblayer/liblayer.hpp>" << std::endl;
   ofs << "#define INSTR_RETURN_LR (0xFFFFFFFF)" << std::endl << std::endl;
 
-  ofs << "class ProgramState : public ExecutionState {" << std::endl;
+  ofs << "class ProgramState : public layer::ExecutionState {" << std::endl;
   ofs << "public:" << std::endl;
-  ofs << "\tuint32_t address_map(uintptr_t addr) override;" << std::endl;
-  ofs << "\tuintptr_t address_resolve(uint32_t addr) override;" << std::endl;
+  ofs << "\tuint32_t memory_map(uintptr_t addr) override;" << std::endl;
+  ofs << "\tuintptr_t memory_resolve(uint32_t addr) override;" << std::endl;
   ofs << "};" << std::endl << std::endl;
 
   ofs << "void eval(ProgramState& ps, uint32_t address);" << std::endl
@@ -180,15 +177,16 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
          "MODIFY DIRECTLY! */"
       << std::endl;
 
-  ofs << "#define LIBLAYER_IMPL" << std::endl;
+  ofs << "#define LAYER_IMPLEMENTATION" << std::endl;
   ofs << "#include <iostream>" << std::endl;
   ofs << "#include <stdexcept>" << std::endl;
   ofs << "#include <string>" << std::endl;
   ofs << "#include <liblayer/liblayer.hpp>" << std::endl;
   ofs << "#include \"code.hpp\"" << std::endl;
   ofs << "#include \"data.hpp\"" << std::endl << std::endl;
-  ofs << "#define INSTR(ADDR) case ADDR: a##ADDR: ps.r[REG_PC] = ADDR+8;"
+  ofs << "#define INN(ADDR) case ADDR: a##ADDR: ps.r[PC] = ADDR+8;"
       << std::endl;
+  ofs << "using namespace layer;" << std::endl;
 
   ofs << std::endl
       << MINIFY_COMMENT("/* ADDRESS MAPPING */") << std::endl
@@ -206,7 +204,7 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
              "function when PC is set it.")
       << std::endl;
 
-  ofs << "\tINSTR(INSTR_RETURN_LR) {" << std::endl;
+  ofs << "\tINN(INSTR_RETURN_LR) {" << std::endl;
   ofs << "\t\treturn;" << std::endl;
   ofs << "\t}" << std::endl << std::endl;
 
@@ -352,13 +350,13 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
 }
 
 void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
-  ofs << "inline uint32_t ProgramState::address_map(uintptr_t addr) {"
+  ofs << "inline uint32_t ProgramState::memory_map(uintptr_t addr) {"
       << std::endl;
 
   ofs << std::hex;
 
   ofs << "\tuint32_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::address_map(addr))) { return mapped; }"
+  ofs << "\tif((mapped = ExecutionState::memory_map(addr))) { return mapped; }"
       << std::endl
       << std::endl;
 
@@ -383,11 +381,11 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
 
   ofs << "}" << std::endl << std::endl;
 
-  ofs << "inline uintptr_t ProgramState::address_resolve(uint32_t addr) {"
+  ofs << "inline uintptr_t ProgramState::memory_resolve(uint32_t addr) {"
       << std::endl;
 
   ofs << "\tuintptr_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::address_resolve(addr))) { return "
+  ofs << "\tif((mapped = ExecutionState::memory_resolve(addr))) { return "
          "mapped; }"
       << std::endl
       << std::endl;
@@ -427,7 +425,7 @@ void Recompiler::emit_code_stubs(std::ofstream &ofs) {
 
     // We need to set LR to INSTR_RETURN_LR for functions to return back
     // properly!
-    ofs << "\tps.r[REG_LR] = INSTR_RETURN_LR;" << std::endl;
+    ofs << "\tps.r[LR] = INSTR_RETURN_LR;" << std::endl;
 
     ofs << "\teval(ps, 0x" << std::hex << functions.second.address << std::dec
         << ");" << std::endl;
@@ -477,7 +475,7 @@ void Recompiler::emit_code_section(std::ofstream &ofs,
   for (arm::addr_t i = 0; i < data_size; i += sizeof(arm::instr_t)) {
     arm::addr_t addr = static_cast<arm::addr_t>(section->get_address() + i);
 
-    ss << std::hex << "\tINSTR(0x" << addr << ") {" << std::dec << std::endl;
+    ss << std::hex << "\tINN(0x" << addr << ") {" << std::dec << std::endl;
 
     arm::instr_t instr_raw;
     memcpy(&instr_raw, data + i, sizeof(arm::instr_t));
@@ -487,7 +485,7 @@ void Recompiler::emit_code_section(std::ofstream &ofs,
 
     if (!_minify) {
       ss << "\t\t" << COND_TABLE[(int)instr.cond] << "(";
-      ss << "DEBUG_LOG(\"0x" << std::hex << addr << ": ";
+      ss << "LAYER_LOG(\"0x" << std::hex << addr << ": ";
       instr.dump(ss);
       ss << "\"));" << std::endl;
     }
@@ -600,8 +598,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
       break;
 
     default: {
-      os << " address = " << std::hex << "ps.r[" << REGISTER_TABLE[REG_PC]
-         << "]; goto __start__;";
+      os << " address = " << std::hex << "ps.r["
+         << REGISTER_TABLE[(int)arm::Register::PC] << "]; goto __start__;";
 
       os << MINIFY_COMMENT(" /* this instruction modifies pc */");
       break;
@@ -694,7 +692,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
     }
 
     if (instr.branch.link) {
-      os << "ps.r[REG_LR] = 0x" << std::hex << address + sizeof(uint32_t)
+      os << "ps.r[LR] = 0x" << std::hex << address + sizeof(uint32_t)
          << std::dec << "; ";
     }
 
@@ -772,8 +770,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
         break;
       }
 
-      os << " address = " << std::hex << "ps.r[" << REGISTER_TABLE[REG_PC]
-         << "]; goto __start__;";
+      os << " address = " << std::hex << "ps.r["
+         << REGISTER_TABLE[(int)arm::Register::PC] << "]; goto __start__;";
 
       os << MINIFY_COMMENT(" /* this instruction modifies pc */");
     }
@@ -799,12 +797,12 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
        << MINIFY_COMMENT(" /* copy */") << ");";
 
     if (instr.blk_data_trans.load) {
-      if (!((instr.blk_data_trans.reg_list >> REG_PC) & 1)) {
+      if (!((instr.blk_data_trans.reg_list >> (int)arm::Register::PC) & 1)) {
         break;
       }
 
-      os << " address = " << std::hex << "ps.r[" << REGISTER_TABLE[REG_PC]
-         << "]; goto __start__;";
+      os << " address = " << std::hex << "ps.r["
+         << REGISTER_TABLE[(int)arm::Register::PC] << "]; goto __start__;";
 
       os << MINIFY_COMMENT(" /* this instruction modifies pc */");
     }

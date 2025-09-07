@@ -1,6 +1,5 @@
 #pragma once
 #include "libcharm/arm.hpp"
-#include <cstdint>
 #include <elfio/elfio.hpp>
 #include <string>
 #include <unordered_map>

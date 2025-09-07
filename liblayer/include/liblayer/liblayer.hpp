@@ -1,99 +1,106 @@
 #pragma once
 #include <cstdint>
-#include <cstring>
 #include <mutex>
+#include <type_traits>
 
-#ifndef LIBLAYER_STACK_BASE
-#define LIBLAYER_STACK_BASE (0xC0000000) // Virtual address of stack pointer
+#ifndef LAYER_STACK_BASE
+#define LAYER_STACK_BASE (0xC0000000) // Virtual address of stack pointer
 #endif
 
-#ifndef LIBLAYER_STACK_SIZE
-#define LIBLAYER_STACK_SIZE (1024 * 1024 * 4) // Size of the stack (4 MB)
+#ifndef LAYER_STACK_SIZE
+#define LAYER_STACK_SIZE (1024 * 1024 * 4) // Size of the stack (4 MB)
 #endif
 
-#ifndef LIBLAYER_MEMORY_BASE
-#define LIBLAYER_MEMORY_BASE (0x10000000) // Virtual address of the memory
+#ifndef LAYER_MEMORY_BASE
+#define LAYER_MEMORY_BASE (0x10000000) // Virtual address of the memory
 #endif
 
-#ifndef LIBLAYER_MEMORY_SIZE
-#define LIBLAYER_MEMORY_SIZE (1024 * 1024 * 64) // Size of the memory (16 MB)
+#ifndef LAYER_MEMORY_SIZE
+#define LAYER_MEMORY_SIZE (1024 * 1024 * 4) // Size of the memory (16 MB)
 #endif
 
-#ifdef LIBLAYER_DEBUG
+#ifdef LAYER_DEBUG
 #include <iostream>
-#define DEBUG_LOG(fmt, ...)                                                    \
+#define LAYER_LOG(fmt, ...)                                                    \
   do {                                                                         \
     std::cout << fmt << std::endl;                                             \
   } while (0)
 #else
-#define DEBUG_LOG(fmt, ...)                                                    \
+#define LAYER_LOG(fmt, ...)                                                    \
   do {                                                                         \
   } while (0)
 #endif
+
+/* Conditions */
+#include "conditions.hpp"
+
+namespace layer {
 
 typedef uint8_t reg_idx_t;
 typedef uint32_t reg_value_t;
 
 // REGISTERS
-enum {
-  REG_R0 = 0,
-  REG_R1 = 1,
-  REG_R2 = 2,
-  REG_R3 = 3,
-  REG_R4 = 4,
-  REG_R5 = 5,
-  REG_R6 = 6,
-  REG_R7 = 7,
-  REG_R8 = 8,
-  REG_R9 = 9,
-  REG_R10 = 10,
-  REG_R11 = 11,
-  REG_R12 = 12,
-  REG_SP = 13,
-  REG_LR = 14,
-  REG_PC = 15,
+enum : reg_idx_t {
+  R0 = 0,
+  R1 = 1,
+  R2 = 2,
+  R3 = 3,
+  R4 = 4,
+  R5 = 5,
+  R6 = 6,
+  R7 = 7,
+  R8 = 8,
+  R9 = 9,
+  R10 = 10,
+  R11 = 11,
+  R12 = 12,
+  SP = 13,
+  LR = 14,
+  PC = 15,
   REG_COUNT = 16,
 };
 
 class ExecutionState {
-private:
-  std::mutex memory_mutex;
-
 public:
-  reg_value_t r[REG_COUNT] = {
-      0, 0,
-      0, 0,
-      0, 0,
-      0, 0,
-      0, 0,
-      0, 0,
-      0, LIBLAYER_STACK_BASE + LIBLAYER_STACK_SIZE - 1, // stack ptr
-      0, 0,
-  };
-
   bool cs, /* carry set */
       vs;  /* overflow set */
   bool mi, /* negative */
       z;   /* zero */
 
-  uint8_t stack[LIBLAYER_STACK_SIZE] = {0}; /* stack */
-  uint8_t *memory = nullptr;                /* memory */
+  reg_value_t r[REG_COUNT] = {
+      0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, LAYER_STACK_BASE + LAYER_STACK_SIZE - 1, // stack ptr
+      0, 0,
+  };
+
+  uint8_t stack[LAYER_STACK_SIZE] = {0}; /* stack */
+  uint8_t *memory = nullptr;             /* memory */
 
   inline ExecutionState() {
-    memory = new uint8_t[LIBLAYER_MEMORY_SIZE];
+    memory = new uint8_t[LAYER_MEMORY_SIZE];
     memory_init();
   }
 
   inline ~ExecutionState() { delete[] memory; }
 
-  virtual uint32_t address_map(uintptr_t addr);
-  virtual uintptr_t address_resolve(uint32_t addr);
-
-  // Allocations
+  // Memory
 
   void memory_init();
   void *memory_alloc(uint32_t size);
   void memory_free(void *p);
+
+  virtual uint32_t memory_map(uintptr_t address);
+  virtual uintptr_t memory_resolve(uint32_t address);
+
+  template <typename T> inline uint32_t memory_map(T address) {
+    static_assert(std::is_pointer_v<T>, "T must be a pointer!");
+    return memory_map(reinterpret_cast<uintptr_t>(address));
+  }
+
+  template <typename T> inline T memory_resolve(uint32_t address) {
+    static_assert(std::is_pointer_v<T>, "T must be a pointer!");
+    return reinterpret_cast<T>(memory_resolve(address));
+  }
 
   // armv4
 
@@ -137,12 +144,14 @@ public:
 
   /* THUMB instructions */
   // TODO: add thumb
+
+private:
+  std::mutex memory_mutex;
 };
 
-/* Conditions */
-#include "conditions.hpp"
+} // namespace layer
 
-#ifdef LIBLAYER_IMPL
+#ifdef LAYER_IMPLEMENTATION
 #include "armv4.cpp"  // ARMv4 (ARM instructions)
 #include "memory.cpp" // addressing / alloc / free
 #endif

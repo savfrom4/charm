@@ -13,12 +13,12 @@ namespace charm {
 
 class Emulator;
 
-class EmulationState : public ExecutionState {
+class EmulationState : public layer::ExecutionState {
 public:
   ELFIO::elfio *_elf;
 
-  uint32_t address_map(uintptr_t addr) override;
-  uintptr_t address_resolve(uint32_t addr) override;
+  uint32_t memory_map(uintptr_t addr) override;
+  uintptr_t memory_resolve(uint32_t addr) override;
 };
 
 class Emulator {
