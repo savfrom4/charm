@@ -1,4 +1,3 @@
-
 #define EQ(x)                                                                  \
   if (ps.z) {                                                                  \
     x;                                                                         \

@@ -7,6 +7,8 @@
 #define BLOCK_SIZE (64)                         // Min allocation
 #define BLOCK_ITER (BLOCK_SIZE + sizeof(Block)) // + sizeof(Block)
 
+namespace layer {
+
 struct Block {
   bool allocated;
   uint32_t size;
@@ -147,3 +149,5 @@ void ExecutionState::memory_free(void *p) {
   blk.allocated = false;
   memcpy(base, &blk, sizeof(Block));
 }
+
+} // namespace layer

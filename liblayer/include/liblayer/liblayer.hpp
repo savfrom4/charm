@@ -20,7 +20,7 @@
 #endif
 
 #ifdef LIBLAYER_DEBUG
-#include <iostream>
+#include <iostream>7
 #define DEBUG_LOG(fmt, ...)                                                    \
   do {                                                                         \
     std::cout << fmt << std::endl;                                             \
@@ -30,6 +30,11 @@
   do {                                                                         \
   } while (0)
 #endif
+
+/* Conditions */
+#include "conditions.hpp"
+
+namespace layer {
 
 typedef uint8_t reg_idx_t;
 typedef uint32_t reg_value_t;
@@ -54,6 +59,8 @@ enum {
   REG_PC = 15,
   REG_COUNT = 16,
 };
+
+struct Allocation {};
 
 class ExecutionState {
 private:
@@ -139,8 +146,7 @@ public:
   // TODO: add thumb
 };
 
-/* Conditions */
-#include "conditions.hpp"
+} // namespace layer
 
 #ifdef LIBLAYER_IMPL
 #include "armv4.cpp"  // ARMv4 (ARM instructions)

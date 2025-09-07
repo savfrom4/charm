@@ -7,6 +7,8 @@
 
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 
+namespace layer {
+
 constexpr inline reg_value_t op2_lsl(reg_value_t value, reg_value_t amount) {
   if (!amount)
     return value;
@@ -720,3 +722,5 @@ inline void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
     }
   }
 }
+
+} // namespace layer
