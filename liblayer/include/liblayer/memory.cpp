@@ -49,7 +49,11 @@ inline uintptr_t ExecutionState::memory_resolve(uint32_t address) {
 void ExecutionState::memory_init() {
   memset(memory, 0, LAYER_MEMORY_SIZE);
 
-  const Block blk = {.allocated = false, .size = BLOCK_SIZE};
+  const Block blk = {
+      .allocated = false,
+      .size = BLOCK_SIZE,
+  };
+
   for (uint32_t i = 0; i < LAYER_MEMORY_SIZE; i += BLOCK_ITER) {
     // discard whats outside the range
     if (i + BLOCK_ITER >= LAYER_MEMORY_SIZE) {
@@ -59,6 +63,7 @@ void ExecutionState::memory_init() {
     memcpy(&memory[i], &blk, sizeof(blk));
   }
 }
+
 void *ExecutionState::memory_alloc(uint32_t size) {
   if (!size) {
     return nullptr;
@@ -89,8 +94,11 @@ void *ExecutionState::memory_alloc(uint32_t size) {
       // if its more than block sizes, split the block in two
       if (diff >= BLOCK_SIZE) {
         uint8_t *next_blk_ptr = ptr + diff + sizeof(Block);
-        const Block next_blk = {.allocated = false,
-                                .size = static_cast<uint32_t>(diff)};
+        const Block next_blk = {
+            .allocated = false,
+            .size = static_cast<uint32_t>(diff),
+        };
+
         memcpy(next_blk_ptr, &next_blk, sizeof(next_blk));
 
         blk.size -= diff;

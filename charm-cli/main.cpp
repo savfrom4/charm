@@ -2,7 +2,7 @@
 #include <libcharm/arm.hpp>
 #include <libcharm/recomp.hpp>
 
-const std::string VERSION = "0.01.00";
+const std::string VERSION = "0.01.10";
 const std::string RECOMP = "recomp";
 const std::string DUMP = "dump";
 const std::string MINIFY = "--minify";

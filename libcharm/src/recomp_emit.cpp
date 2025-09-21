@@ -83,11 +83,12 @@ void Recompiler::emit_makefile(const std::string &output_dir) {
   std::ofstream ofs{makefile_path};
 
   ofs << "CXX ?= c++" << std::endl;
-  ofs << "CXXFLAGS = -Iliblayer/include -std=c++17 -flto -fPIC -w $(MAKEOPT)"
+  ofs << "CXXFLAGS = -I. -Iliblayer/include -std=c++17 -flto -fPIC -w "
+         "$(MAKEOPT)"
       << std::endl
       << std::endl;
 
-  ofs << "SRCS = code.cpp data.cpp" << std::endl;
+  ofs << "SRCS = code.cpp data.cpp $(SCRSOPT)" << std::endl;
   ofs << "OBJS = $(SRCS:.cpp=.o)" << std::endl;
   ofs << "NAME = exec" << std::endl << std::endl;
 

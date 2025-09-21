@@ -16,7 +16,7 @@
 #endif
 
 #ifndef LAYER_MEMORY_SIZE
-#define LAYER_MEMORY_SIZE (1024 * 1024 * 4) // Size of the memory (16 MB)
+#define LAYER_MEMORY_SIZE (1024 * 1024 * 16) // Size of the memory (16 MB)
 #endif
 
 #ifdef LAYER_DEBUG
