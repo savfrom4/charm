@@ -6,7 +6,7 @@ This project is in active development, as such a lot **WILL** change. For furthe
 
 `charm` is an effort to create an `arm32` static recompiler, that compiles arm to cross-platform C++ code and can produce output without requiring user to tweak the resulting code.
 
-It does so by emulating arm instructions, implementing virtual addressing routines (that user can override) and creating several methods of overriting already existing functions. The drawback is that output is not human-readable C++ code, but rather something closer to the original assembly.
+It does so by implementing virtual addressing routines (that user can override) and creating several methods of overriting already existing functions. The drawback is that output is not human-readable C++ code, but rather something closer to the original assembly.
 
 Please note that this project currently **only supports recompiling `Linux` binaries** and only works with those that are **compiled for `armv4t` (without Thumb)**.
 

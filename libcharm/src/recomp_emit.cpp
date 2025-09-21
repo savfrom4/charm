@@ -224,7 +224,7 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
     ofs << "\tINN(0x" << functions.second.address << ") {" << std::endl;
     ofs << "\t\texternal_" << symbol_name_map(functions.second.name) << "(ps);"
         << std::endl;
-    ofs << "\t\treturn;" << std::endl;
+    ofs << "\t\taddress = ps.r[LR]; goto __start__;" << std::endl;
     ofs << "\t}" << std::endl << std::endl;
   }
   ofs << std::dec;
