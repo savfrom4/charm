@@ -1,5 +1,4 @@
 #include "libcharm/arm.hpp"
-#include "libcharm/emulator.hpp"
 #include "libcharm/recomp.hpp"
 #include <ostream>
 #include <sstream>
@@ -9,18 +8,13 @@ namespace charm::recomp {
 
 void Recompiler::step_analyze() {
   analyze_reloc_dyn();
-
-  // only analyze if we have both
-  if (_plt && _dynsym) {
-    analyze_reloc_plt();
-    analyze_map_plt_to_reloc();
-  }
+  analyze_reloc_plt();
 
   analyze_exported_functions();
 }
 
 // This step iterates trough .GOT table in the ELF binary and collects
-// symbols as well as their names. The entries are later used to build a virtual
+// symbols as well as their names. The entries are later used to build virtual
 // .GOT mappings.
 void Recompiler::analyze_reloc_dyn() {
   std::cout << "> Inspecting dyn relocation table ..." << std::endl;
@@ -71,6 +65,11 @@ void Recompiler::analyze_reloc_dyn() {
 void Recompiler::analyze_reloc_plt() {
   std::cout << "> Inspecting the relocation table ..." << std::endl;
 
+  if (!_relplt) {
+    std::cout << "\trelplt is not present!" << std::endl;
+    return;
+  }
+
   ELFIO::symbol_section_accessor symbols(_elf, _dynsym);
   ELFIO::relocation_section_accessor relocations(_elf, _relplt);
 
@@ -93,13 +92,13 @@ void Recompiler::analyze_reloc_plt() {
     if (!symbols.get_symbol(symbol_index, name, value, size, bind, type_sym,
                             shndx, other)) {
       std::stringstream ss;
-      ss << "unnamed_0x" << std::hex << value;
+      ss << "unknown_0x" << std::hex << value;
 
       // included within the binary
       std::cout << "\t" << std::hex << ss.str() << " offset 0x" << offset
                 << std::dec << std::endl;
 
-      _funs_deps[offset] = Function{
+      _funs_reloc[offset] = Function{
           .name = ss.str(),
           .address = static_cast<arm::addr_t>(offset),
           .is_external = true,
@@ -115,16 +114,20 @@ void Recompiler::analyze_reloc_plt() {
       std::cout << "\t" << name << " is internal ..." << std::endl;
     }
 
-    _funs_deps[offset] = Function{
-        .name = name, // TODO: multiple entries can have the same name!
+    _funs_reloc[offset] = Function{
+        .name = name,
         .address = value != 0
                        ? static_cast<arm::addr_t>(value)   // virtual address
                        : static_cast<arm::addr_t>(offset), // .got offset
         .is_external = !value,
     };
+
+    _got_mappings.push_back(
+        std::make_tuple(offset, value != 0 ? static_cast<arm::addr_t>(value)
+                                           : static_cast<arm::addr_t>(offset)));
   }
 
-  std::cout << "\tFound " << _funs_deps.size() << " functions!" << std::endl;
+  std::cout << "\tFound " << _funs_reloc.size() << " functions!" << std::endl;
 }
 
 // This step collects all functions that executable "exports".
@@ -150,10 +153,6 @@ void Recompiler::analyze_exported_functions() {
       continue;
     }
 
-    if (shndx != _text->get_index()) {
-      continue;
-    }
-
     _funs_exports[value] = Function{
         .name = name, // TODO: multiple entries can have the same name!
         .address = static_cast<arm::addr_t>(value),
@@ -162,47 +161,5 @@ void Recompiler::analyze_exported_functions() {
   }
 
   std::cout << "\tFound " << _funs_exports.size() << " functions!" << std::endl;
-}
-
-// This step emulates .plt to determine addresses correspond to which entries
-// that we collected before.
-void Recompiler::analyze_map_plt_to_reloc() {
-  std::cout << "> Mapping plt to reloc table ..." << std::endl;
-  Emulator emu{&_elf, static_cast<arm::addr_t>(_plt->get_address())};
-
-  arm::addr_t start = _plt->get_address(); // Start of the block
-  arm::addr_t section_end = _plt->get_address() + _plt->get_size();
-  arm::Instruction instr;
-
-  while (emu.ps.r[(int)arm::Register::PC] - 8 < section_end) {
-    if (!emu.step(instr)) {
-      break;
-    }
-
-    if (instr.group != arm::InstructionGroup::SINGLE_DATA_TRANSFER ||
-        !instr.data_trans.load || instr.data_trans.rd != arm::Register::PC) {
-      continue;
-    }
-
-    arm::instr_t result = emu.ps.r[(int)instr.data_trans.rn];
-    arm::addr_t end = emu.ps.r[(int)arm::Register::PC] - 8;
-
-    if (!_funs_deps.count(result)) {
-      start = end;
-      continue;
-    }
-
-    std::cout << "\t" << std::hex << _funs_deps[result].name << " mapped to 0x "
-              << start << "...0x" << end << std::dec << std::endl;
-
-    for (arm::addr_t i = start; i < end; i++) {
-      _fun_deps_mapped[i] = &_funs_deps[result];
-    }
-
-    start = end;
-  }
-
-  std::cout << "\tMapped " << _fun_deps_mapped.size() << " ranges!"
-            << std::endl;
 }
 } // namespace charm::recomp

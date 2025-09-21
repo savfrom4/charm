@@ -25,11 +25,6 @@ Recompiler::Recompiler(const std::string &elf_exe, bool minify) {
     throw std::runtime_error("Missing .text!");
   }
 
-  _plt = _elf.sections[".plt"];
-  if (!_plt) {
-    std::cout << "> Executable is missing plt table!" << std::endl;
-  }
-
   _relplt = _elf.sections[".rel.plt"];
   if (!_relplt)
     _relplt = _elf.sections[".rela.plt"];

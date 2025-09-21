@@ -24,7 +24,6 @@ private:
   void analyze_reloc_plt();
   void analyze_reloc_dyn();
   void analyze_exported_functions();
-  void analyze_map_plt_to_reloc();
 
   void emit_makefile(const std::string &output_dir);
   void emit_code_source(const std::string &output_dir);
@@ -50,12 +49,11 @@ private:
 
   bool _minify;
   ELFIO::elfio _elf;
-  ELFIO::section *_text, *_plt, *_relplt, *_reldyn, *_dynsym;
+  ELFIO::section *_text, *_relplt, *_reldyn, *_dynsym;
 
   std::vector<std::tuple<arm::addr_t, arm::addr_t>> _got_mappings;
-  std::unordered_map<arm::addr_t, Function> _funs_deps;
+  std::unordered_map<arm::addr_t, Function> _funs_reloc;
   std::unordered_map<arm::addr_t, Function> _funs_exports;
-  std::unordered_map<arm::addr_t, Function *> _fun_deps_mapped;
 };
 
 } // namespace charm::recomp

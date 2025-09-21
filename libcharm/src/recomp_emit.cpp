@@ -83,7 +83,6 @@ void Recompiler::emit_makefile(const std::string &output_dir) {
   std::ofstream ofs{makefile_path};
 
   ofs << "CXX ?= c++" << std::endl;
-  ofs << "OPT = -O2" << std::endl;
   ofs << "CXXFLAGS = -Iliblayer/include -std=c++17 -flto -fPIC -w $(MAKEOPT)"
       << std::endl
       << std::endl;
@@ -96,7 +95,7 @@ void Recompiler::emit_makefile(const std::string &output_dir) {
   ofs << "SHARED ?= 0" << std::endl << std::endl;
 
   ofs << "ifeq ($(RELEASE),0)" << std::endl
-      << "\tCXXFLAGS += -g" << std::endl
+      << "\tCXXFLAGS += -g -fsanitize=address" << std::endl
       << "else" << std::endl
       << "\tCXXFLAGS += -O3" << std::endl
       << "endif" << std::endl
@@ -157,7 +156,7 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
       << MINIFY_COMMENT("/* DEPENDENCIES */") << std::endl
       << std::endl;
 
-  for (auto &functions : _funs_deps) {
+  for (auto &functions : _funs_reloc) {
     if (!functions.second.is_external) {
       continue;
     }
@@ -186,6 +185,10 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
   ofs << "#include \"data.hpp\"" << std::endl << std::endl;
   ofs << "#define INN(ADDR) case ADDR: a##ADDR: ps.r[PC] = ADDR+8;"
       << std::endl;
+  ofs << "#define EXPORT(name, address) __attribute__((weak)) void "
+         "name (ProgramState& ps) {ps.r[LR] = INSTR_RETURN_LR; "
+         "eval(ps, address);}"
+      << std::endl;
   ofs << "using namespace layer;" << std::endl;
 
   ofs << std::endl
@@ -207,6 +210,24 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
   ofs << "\tINN(INSTR_RETURN_LR) {" << std::endl;
   ofs << "\t\treturn;" << std::endl;
   ofs << "\t}" << std::endl << std::endl;
+
+  ofs << MINIFY_COMMENT(
+             "\t// mapping external functions to their .got addresses")
+      << std::endl;
+
+  ofs << std::hex;
+  for (auto &functions : _funs_reloc) {
+    if (!functions.second.is_external) {
+      continue;
+    }
+
+    ofs << "\tINN(0x" << functions.second.address << ") {" << std::endl;
+    ofs << "\t\texternal_" << symbol_name_map(functions.second.name) << "(ps);"
+        << std::endl;
+    ofs << "\t\treturn;" << std::endl;
+    ofs << "\t}" << std::endl << std::endl;
+  }
+  ofs << std::dec;
 
   for (auto &section : _elf.sections) {
     if (!section_is_code(section.get())) {
@@ -418,32 +439,25 @@ void Recompiler::emit_code_stubs(std::ofstream &ofs) {
       << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl
       << std::endl;
 
+  ofs << std::hex;
   for (auto &functions : _funs_exports) {
-    ofs << "__attribute__((weak)) void internal_"
-        << symbol_name_map(functions.second.name) << "(ProgramState& ps) {"
-        << std::endl;
-
-    // We need to set LR to INSTR_RETURN_LR for functions to return back
-    // properly!
-    ofs << "\tps.r[LR] = INSTR_RETURN_LR;" << std::endl;
-
-    ofs << "\teval(ps, 0x" << std::hex << functions.second.address << std::dec
-        << ");" << std::endl;
-
-    ofs << "}" << std::endl << std::endl;
+    ofs << "EXPORT(internal_" << symbol_name_map(functions.second.name)
+        << ", 0x" << functions.second.address << ");" << std::endl;
   }
+  ofs << std::dec;
 
   ofs << std::endl
       << MINIFY_COMMENT("/* DEPENDENCY STUBS */") << std::endl
       << std::endl;
 
-  for (auto &functions : _funs_deps) {
+  for (auto &functions : _funs_reloc) {
     if (!functions.second.is_external) {
       continue;
     }
 
-    ofs << "__attribute__((weak)) void external_" << functions.second.name
-        << "(ProgramState& ps) {" << std::endl;
+    ofs << "__attribute__((weak)) void external_"
+        << symbol_name_map(functions.second.name) << "(ProgramState& ps) {"
+        << std::endl;
     ofs << "\tstd::cout << \"stub: " << symbol_name_map(functions.second.name)
         << "\" << std::endl;" << std::endl;
     ofs << "}" << std::endl << std::endl;
@@ -650,25 +664,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
   case arm::InstructionGroup::BRANCH: {
     uint32_t final_offset = (int64_t)(address + 8) + instr.branch.offset;
-    Function *mapped = nullptr;
 
     // maybe we are calling external fn
-    if (_fun_deps_mapped.count(final_offset)) {
-      mapped = _fun_deps_mapped[final_offset];
-
-      if (mapped->is_external) {
-        os << "external_" << mapped->name << "(ps)";
-
-        if (!instr.branch.link) {
-          os << MINIFY_COMMENT(" /* b, not bl */");
-        }
-
-        break;
-      }
-
-      final_offset = mapped->address;
-    }
-
     bool found_section = false;
     for (auto &section : _elf.sections) {
       if (!section_is_code(section.get())) {
@@ -692,16 +689,14 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
     }
 
     if (instr.branch.link) {
-      os << "ps.r[LR] = 0x" << std::hex << address + sizeof(uint32_t)
-         << std::dec << "; ";
+      os << "ps.r[LR] = 0x" << std::hex << address + 4 << std::dec << "; ";
+      os << "address = " << std::hex << "0x" << final_offset
+         << "; goto __start__; " << MINIFY_COMMENT("/* bl */");
+      break;
     }
 
-    os << "goto a0x" << std::hex << final_offset << std::dec;
-
-    if (!_minify && mapped) {
-      os << " /* ref: " << mapped->name << " */";
-    }
-
+    // lets hope no one will raw branch into a function...
+    os << "goto a0x" << std::hex << final_offset << std::dec << "/* b */";
     break;
   }
 
@@ -886,10 +881,6 @@ inline bool section_is_data(const ELFIO::section *section) {
     return false;
   }
 
-  if (section->get_name().find("plt") != std::string::npos) {
-    return false;
-  }
-
   if (section->get_name().find("padding") != std::string::npos) {
     return false;
   }
@@ -903,10 +894,6 @@ inline bool section_is_data(const ELFIO::section *section) {
 
 inline bool section_is_code(const ELFIO::section *section) {
   if (!(section->get_flags() & ELFIO::SHF_EXECINSTR)) {
-    return false;
-  }
-
-  if (section->get_name().find("plt") != std::string::npos) {
     return false;
   }
 

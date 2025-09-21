@@ -1,6 +1,5 @@
 #include "elfio/elfio.hpp"
 #include <libcharm/arm.hpp>
-#include <libcharm/emulator.hpp>
 #include <libcharm/recomp.hpp>
 
 const std::string VERSION = "0.01.00";

@@ -8,7 +8,6 @@ libcharm = library(
 
   sources: [
     'src/arm.cpp',
-    'src/emulator.cpp',
     'src/recomp.cpp',
     'src/recomp_analysis.cpp',
     'src/recomp_emit.cpp',
