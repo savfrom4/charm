@@ -120,7 +120,7 @@ public:
 
   Condition cond = Condition::AL;
   InstructionGroup group = InstructionGroup::INVALID;
-  bool is_imm, set_cond;
+  bool is_imm, set_flags;
 
   union {
     struct {

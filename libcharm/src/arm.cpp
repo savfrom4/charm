@@ -135,7 +135,7 @@ inline void Instruction::decode_data_processing(instr_t instr) {
   data.op =
       static_cast<Opcode>(get_bits<21, 4>(instr)); /* Opcode, bits 21-24 */
 
-  set_cond = get_bits<20>(instr); /* Set condition flags, bit 20 */
+  set_flags = get_bits<20>(instr); /* Set condition flags, bit 20 */
   data.rn = static_cast<Register>(
       get_bits<16, 4>(instr)); /* Rn register, bits 16-19 */
   data.rd = static_cast<Register>(
@@ -160,7 +160,7 @@ inline void Instruction::decode_multiply(instr_t instr) {
   group = InstructionGroup::MULTIPLY;
 
   mul.accumulate = get_bits<21>(instr); /* Accumulate, bit 21 */
-  set_cond = get_bits<20>(instr);       /* Set condition flags, bit 20 */
+  set_flags = get_bits<20>(instr);      /* Set condition flags, bit 20 */
 
   mul.rd = static_cast<Register>(
       get_bits<16, 4>(instr)); /* Rd register, bits 16-19 */
@@ -178,7 +178,7 @@ inline void Instruction::decode_multiply_long(instr_t instr) {
 
   mul_long.sign = get_bits<22>(instr);       /* Unsigned, bit 22 */
   mul_long.accumulate = get_bits<21>(instr); /* Accumulate, bit 21 */
-  set_cond = get_bits<20>(instr);            /* Set condition flags, bit 20 */
+  set_flags = get_bits<20>(instr);           /* Set condition flags, bit 20 */
 
   mul_long.rd_hi = static_cast<Register>(
       get_bits<16, 4>(instr)); /* RdHi register, bits 16-19 */

@@ -8,37 +8,68 @@
 
 namespace layer {
 
-constexpr inline reg_value_t op2_lsl(reg_value_t value, reg_value_t amount) {
+constexpr inline reg_value_t op2_lsl(ExecutionState &ps, bool s,
+                                     reg_value_t value, reg_value_t amount) {
   if (!amount)
     return value;
 
-  return (amount >= 32) ? 0 : value << amount;
+  if (amount > 32) {
+    ps.cs = false;
+    return 0;
+  }
+
+  if (amount == 32) {
+    ps.cs = (value & 1) != 0; // bit 0
+    return 0;
+  }
+
+  ps.cs = (value & (1u << (32 - amount))) != 0; // last shifted bit
+  return value << amount;
 }
 
-constexpr inline reg_value_t op2_lsr(reg_value_t value, reg_value_t amount) {
+constexpr inline reg_value_t op2_lsr(ExecutionState &ps, bool s,
+                                     reg_value_t value, reg_value_t amount) {
   if (!amount)
     return value;
 
-  return (amount >= 32) ? 0 : value >> amount;
+  if (amount > 32) {
+    ps.cs = false;
+    return 0;
+  }
+
+  if (amount == 32) {
+    ps.cs = (value & (1 << 31)) != 0; // bit 31
+    return 0;
+  }
+
+  ps.cs = (value & (1u << (amount - 1))) != 0; // last shifted bit
+  return value >> amount;
 }
 
-constexpr inline reg_value_t op2_asr(reg_value_t value, reg_value_t amount) {
+constexpr inline reg_value_t op2_asr(ExecutionState &ps, bool s,
+                                     reg_value_t value, reg_value_t amount) {
   if (!amount)
     return value;
 
-  if (amount >= 32)
-    return (value & 0x80000000) ? 0xFFFFFFFF : 0;
+  if (amount >= 32) {
+    ps.cs = (value & 0x80000000) != 0;
+    return ps.cs ? 0xFFFFFFFF : 0;
+  }
+
+  ps.cs = (value & (1u << (amount - 1))) != 0; // last shifted bit
   return ((int32_t)value) >> amount;
 }
 
-constexpr inline reg_value_t op2_ror(reg_value_t value, reg_value_t amount) {
+constexpr inline reg_value_t op2_ror(ExecutionState &ps, bool s,
+                                     reg_value_t value, reg_value_t amount) {
   if (!amount)
     return value;
 
-  amount &= 0x1F;
-  if (amount == 0) {
+  if (!(amount &= 0x1F)) {
     return value;
   }
+
+  ps.cs = (value & (1u << (amount - 1))) != 0; // last shifted bit
   return (value >> amount) | (value << (32 - amount));
 }
 

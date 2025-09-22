@@ -544,7 +544,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
   case arm::InstructionGroup::DATA_PROCESSING: {
     if (instr.is_imm) {
       os << OPCODE_TABLE[(int)instr.data.op] << "("
-         << (instr.set_cond ? "true" : "false")
+         << (instr.set_flags ? "true" : "false")
          << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
          << REGISTER_TABLE[(int)instr.data.rd]
@@ -560,7 +560,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
     if (instr.data.op2_reg.is_reg) {
       os << OPCODE_TABLE[(int)instr.data.op] << "("
-         << (instr.set_cond ? "true" : "false")
+         << (instr.set_flags ? "true" : "false")
          << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
          << REGISTER_TABLE[(int)instr.data.rd]
@@ -569,7 +569,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
          << REGISTER_TABLE[(int)instr.data.rn]
          << MINIFY_COMMENT_COMMA(" /* rn */, ")
 
-         << SHIFT_TABLE[(int)instr.data.op2_reg.type] << "(ps.r["
+         << SHIFT_TABLE[(int)instr.data.op2_reg.type] << "(ps, "
+         << (instr.set_flags ? "true" : "false") << ", ps.r["
 
          << REGISTER_TABLE[(int)instr.data.op2_reg.rm] << "]"
          << MINIFY_COMMENT_COMMA(" /* rm */, ")
@@ -579,7 +580,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
     } else {
       os << OPCODE_TABLE[(int)instr.data.op] << "("
-         << (instr.set_cond ? "true" : "false")
+         << (instr.set_flags ? "true" : "false")
          << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
          << REGISTER_TABLE[(int)instr.data.rd]
@@ -588,7 +589,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
          << REGISTER_TABLE[(int)instr.data.rn]
          << MINIFY_COMMENT_COMMA(" /* rn */, ")
 
-         << SHIFT_TABLE[(int)instr.data.op2_reg.type] << "(ps.r["
+         << SHIFT_TABLE[(int)instr.data.op2_reg.type] << "(ps, "
+         << (instr.set_flags ? "true" : "false") << ", ps.r["
 
          << REGISTER_TABLE[(int)instr.data.op2_reg.rm] << "]"
          << MINIFY_COMMENT_COMMA(" /* rm */, ")
@@ -626,7 +628,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
   case arm::InstructionGroup::MULTIPLY:
     os << (instr.mul.accumulate ? "ps.arm_mla" : "ps.arm_mul") << "("
-       << (instr.set_cond ? "true" : "false")
+       << (instr.set_flags ? "true" : "false")
        << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
        << REGISTER_TABLE[(int)instr.mul.rd]
@@ -644,7 +646,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
   case arm::InstructionGroup::MULTIPLY_LONG:
     os << (instr.mul_long.accumulate ? "ps.arm_mlal" : "ps.arm_mull") << "("
-       << (instr.set_cond ? "true" : "false")
+       << (instr.set_flags ? "true" : "false")
        << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
        << (instr.mul_long.sign ? "true" : "false")
@@ -739,7 +741,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
          << MINIFY_COMMENT(" /* offset */");
     } else {
       if (instr.data_trans.offset_reg.is_reg) {
-        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type] << "(ps.r["
+        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type]
+           << "(ps, false, ps.r["
            << REGISTER_TABLE[(int)instr.data_trans.offset_reg.rm] << "]"
            << MINIFY_COMMENT_COMMA(" /* rm */,")
 
@@ -747,8 +750,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
            << REGISTER_TABLE[(int)instr.data_trans.offset_reg.amount_or_rs]
            << "]" << MINIFY_COMMENT(" /* rs */") << ")";
       } else {
-        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type] << "(ps.r["
-
+        os << SHIFT_TABLE[(int)instr.data_trans.offset_reg.type]
+           << "(ps, false, ps.r["
            << REGISTER_TABLE[(int)instr.data_trans.offset_reg.rm] << "]"
            << MINIFY_COMMENT_COMMA(" /* rm */,")
 
