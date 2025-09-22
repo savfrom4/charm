@@ -1,5 +1,6 @@
 #include "libcharm/arm.hpp"
 #include <array>
+#include <iostream>
 
 const std::array<std::string, (int)charm::arm::Opcode::COUNT> OPCODE_TABLE = {
     "and", "eor", "sub", "rsb", "add", "adc", "sbc", "rsc",

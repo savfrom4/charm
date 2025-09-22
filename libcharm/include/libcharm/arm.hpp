@@ -35,22 +35,22 @@ enum class Register : uint8_t {
 };
 
 enum class Opcode : uint8_t {
-  AND = 0x0, /* logical and */
-  EOR = 0x1, /* logical exclusive or */
-  SUB = 0x2, /* subtract (no carry) */
-  RSB = 0x3, /* reverse subtract (no carry) */
-  ADD = 0x4, /* add (no carry) */
-  ADC = 0x5, /* add (carry) */
-  SBC = 0x6, /* subtract (carry) */
-  RSC = 0x7, /* reverse subtract (carry) */
-  TST = 0x8, /* test bits */
-  TEQ = 0x9, /* test eql */
-  CMP = 0xA, /* compare */
-  CMN = 0xB, /* compare negative */
-  ORR = 0xC, /* logical or */
-  MOV = 0xD, /* move */
-  BIC = 0xE, /* bit clear */
-  MVN = 0xF, /* move not */
+  AND, /* logical and */
+  EOR, /* logical exclusive or */
+  SUB, /* subtract (no carry) */
+  RSB, /* reverse subtract (no carry) */
+  ADD, /* add (no carry) */
+  ADC, /* add (carry) */
+  SBC, /* subtract (carry) */
+  RSC, /* reverse subtract (carry) */
+  TST, /* test bits */
+  TEQ, /* test eql */
+  CMP, /* compare */
+  CMN, /* compare negative */
+  ORR, /* logical or */
+  MOV, /* move */
+  BIC, /* bit clear */
+  MVN, /* move not */
 
   COUNT,
   INVALID = 0xFF,

@@ -1,6 +1,8 @@
 #include "liblayer.hpp"
 #include <cstring>
+#include <iostream>
 #include <mutex>
+#include <ostream>
 
 #define BLOCK_SIZE (64)                         // Min allocation
 #define BLOCK_ITER (BLOCK_SIZE + sizeof(Block)) // + sizeof(Block)
@@ -127,6 +129,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
       accumulated_size += next_blk.size;
       n++;
       if (accumulated_size >= size) {
+        std::cout << "fa" << std::endl;
         found = true;
         break;
       }
@@ -135,6 +138,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
     }
 
     if (found) {
+      std::cout << "ok" << std::endl;
       blk.size = accumulated_size + n * sizeof(Block);
       blk.allocated = true;
 
