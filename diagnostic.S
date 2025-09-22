@@ -29,9 +29,9 @@ data_processing:
 
     @ and
     ands r0, r0, r1
-    bne fail
-    ands r0, r0, #0
     beq fail
+    ands r0, r0, #0
+    bne fail
 
     mov r0, #67
     mov r1, #1
@@ -50,6 +50,10 @@ data_processing:
 
     bcc fail @ carry MUST be set
     beq fail @ zero must NOT be set
+    
+    ldr r1, =constant2
+    ldr r1, [r1]
+
     cmp r0, r1 @ finally compare to constant
     bne fail
 
@@ -80,12 +84,9 @@ data_processing:
     mvn r0, #0xFFFFFFFF @ NOT 0xFFFFFFFF = 0
     bne fail
 
-    b success
+    mov r0, #0
+    pop {r1-ip, pc}
 
 fail:
     mov r0, #1
-    pop {r1-ip, pc}
-
-success:
-    mov r0, #0
     pop {r1-ip, pc}
