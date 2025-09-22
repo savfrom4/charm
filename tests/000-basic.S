@@ -1,25 +1,34 @@
 .section .rodata
 
-dead_boob:
-.word 0xDEADB00B
-
-garbage_boob:
-.word 0x6F56D805
-
-cool_constant:
-.word 4
+@ Used by test1
+dead_beef:
+.word 0xDEADBEEF
+shifted_dead_beef:
+.word 0x6F56DF77
 cool_array:
 .word 0x69
 .word 0x48
 .word 0x32
 .word 0x16
+cool_constant:
+.word 4
+
+@ Used by test2
+
+memory:
+.space 64*4*2, 0
+memory_size:
+.word 64*4*2
 
 .section .text
-.global sanity_check
-.type   sanity_check,     %function
+.global test1
+.type   test1,     %function
+.global test2
+.type   test2,     %function
 
-@ Very basic test, if it doesn't pass this then we're doomed
-sanity_check:
+@ Very basic test subroutine, if it doesn't pass this then we're doomed
+@   Input: none
+test1:
     push {r1, r2, r3, r4, lr}
 
     mov r0, #0x69 @ 105
@@ -29,13 +38,13 @@ sanity_check:
     beq fail @ stop if zero is set
 
     cmp r0, r1 @ Compare r0 against r1
-    movhi r1, #0xEE @ if r0 > r1, move 0xB00B into r1
-    ldr r1, =dead_boob @ if r0 <= r1, move 0xDEADB00B into r1
+    movhi r1, #0xEE @ if r0 > r1, move 0xEE into r1
+    ldr r1, =dead_beef @ if r0 <= r1, move 0xDEADBEEF into r1
     ldr r1, [r1] 
 
     @ Since 66 < 72, r1 should be 0xDEADB00B
     mov r1, r1, lsr #1 @ Than means if we shift it left it should overflow
-    ldr r0, =garbage_boob @ And we should get this value
+    ldr r0, =shifted_dead_beef @ And we should get this value
     ldr r0, [r0]  
     cmp r1, r0 @ compare
     bne fail @ stop if zero is set
@@ -64,9 +73,41 @@ sanity_check:
     cmp r4, r0 @ r4 should be  =cool_array + 16 (4*4)
     bne fail @ stop if zero is set
 
-    mov r0, #69 @ congrats, we passed!
+    mov r0, #1 @ congrats, we passed!
     pop {r1, r2, r3, r4, pc}
 
 fail:
-    mov r0, #68
+    mov r0, #0
     pop {r1, r2, r3, r4, pc}
+
+@ This test is more advanced test of multiplication, stack and memory
+@   Input: r0
+test2:
+    push {r2, r3, r4, lr}
+
+    @ setup first loop
+    mov r4, #64
+loop1:
+    mul r1, r0, r4 @ r1 = r0 * r4 (32 bit)
+    mla r2, r0, r4, r1 @ r2 = r0 + r4 + r1 (32 bit)
+    push {r1, r2}
+
+    @ Finally loop again if possible
+    sub r4, r4, #1
+    bne loop1
+
+    ldr r3, =memory
+    mov r4, #64
+loop2:
+    pop {r3, r4}
+    umull r1, r2, r3, r4  @ r1 (lo), r2 (hi) = r1 * r2
+    stm r3!, {r1, r2}
+
+    @ Finally loop again if possible
+    sub r4, r4, #1
+    bne loop2
+
+    ldr r0, =memory
+    ldr r1, =memory_size
+    ldr r1, [r1]
+    pop {r2, r3, r4, pc}
