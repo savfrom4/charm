@@ -8,13 +8,18 @@
 .global     qoi_decode
 .type       qoi_decode,     %function
 
-.macro swap32 reg
-    push    { r0 }
-    mov     r0, \reg
-    bl      __bswap_32
-    mov     \reg, r0
-    pop     { r0 }
-.endm
+@ named registers
+var_data_ptr        .req    r0
+var_data_len        .req    r1
+var_info_ptr        .req    r2
+
+var_image_width     .req    r3
+var_image_height    .req    r4
+var_image_channels  .req    r5
+var_color_r         .req    r6
+var_color_g         .req    r7
+var_color_b         .req    r8
+var_color_a         .req    r9
 
 .equ QOI_HEAD_SIZE,     14
 .equ QOI_MAGIC,         0x716F6966
@@ -26,143 +31,209 @@
 .equ QOI_OP_DIFF,       0x40
 .equ QOI_OP_LUMA,       0x80
 .equ QOI_OP_RUN,        0xc0
+.equ QOI_PADDING,       0x08
+
+.macro swap32 reg
+    push    { r0, lr }
+    mov     r0, \reg
+    bl      __bswap_32
+    mov     \reg, r0
+    pop     { r0, lr }
+.endm
+
+@ direct port of QOI_COLOR_HASH macro with index wrapping built-in
+@ also we sin by using r12 as return value... not that we are following callconv anyways...
+.macro rgba_hash
+    mov     r11, #3
+    mul     r12, r11, var_color_r   @ C.rgba.r*3
+
+    mov     r11, #5
+    mla     r12, var_color_g, r11, r12 @ C.rgba.r*3 + C.rgba.g*5
+
+    mov     r11, #7
+    mla     r12, var_color_b, r11, r12 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
+
+    mov     r11, #11
+    mla     r12, var_color_a, r11, r12 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
+
+    and     r12, r12, #63   @ & (64 - 1)
+.endm
+
+.macro rgba_load reg
+    ldrb    var_color_r,    [\reg], #1 @ r
+    ldrb    var_color_g,    [\reg], #1 @ g
+    ldrb    var_color_b,    [\reg], #1 @ b
+    ldrb    var_color_a,    [\reg], #1 @ a
+.endm
+
+.macro rgba_store reg
+    strb    var_color_r,    [\reg], #1 @ r
+    strb    var_color_g,    [\reg], #1 @ g
+    strb    var_color_b,    [\reg], #1 @ b
+    strb    var_color_a,    [\reg], #1 @ a
+.endm
 
 qoi_decode:
-    push    { r1-r11, lr }
+    push    { r1-r12, lr }
 
     @ check if any of the provided arguments are 0
-    orr     r3, r0, r1
-    orrs    r3, r3, r2
+    orr     r3, var_data_ptr, var_data_len
+    orrs    r3, r3, var_info_ptr
     beq     fail
 
     @ check if we have enough bytes for qoi header
-    swap32  r1
-    cmp     r1, #QOI_HEAD_SIZE
+    cmp     var_data_len, #QOI_HEAD_SIZE
     blo     fail
 
-    bl      subroutine_read_header
-    bl      subroutine_decode
+    bl      read_header
+    bl      decode
 
-    pop     { r1-r11, pc}
+    pop     { r1-r12, pc }
 
-    fail:
-        mov     r0, #0      @ Failed
-        pop     { r1-r11, pc }
+fail:
+    mov     r0, #0
+    pop     { r1-r12, pc }
 
 
-subroutine_read_header:
+read_header:
     @ load qoi magic
-    ldr     r5, =QOI_MAGIC
+    ldr     r3, =QOI_MAGIC
 
     @ read qoi magic
-    ldr     r4, [r0]!
-    cmp     r4, r5
+    ldr     r4, [var_data_ptr], #4
+    swap32  r4
+    cmp     r4, r3
     bne     fail
 
-    ldm     r0!, { r4, r5 } @ read width/height
-    swap32  r4
-    swap32  r5
+    ldm     var_data_ptr!, { var_image_width, var_image_height } @ read width/height
+    swap32  var_image_width
+    swap32  var_image_height
+    stm     var_info_ptr!, { var_image_width, var_image_height } @ store info
 
-    @ store info
-    stm     r2!, { r4, r5 }
+    ldrb    var_image_channels, [var_data_ptr], #1 @ read channels
+    str     var_image_channels, [var_info_ptr], #4 @ store info
 
-    ldrb    r6, [r0]!       @ read channels
-    str     r6, [r2]!       @ store info
-
-    ldrb    r7, [r0]!       @ read colorspace
     bx      lr
 
-subroutine_decode:
-    sub     sp, sp, #256 @ alloc index array on stack (64*4)
-    add     r1, r0, r1   @ ptr + size (end ptr)
+decode:
+var_data_end_ptr    .req    r1
+var_decoded_ptr     .req    r2
+var_data_run        .req    r3
+var_index_array_ptr .req    r4
+    push    {var_data_ptr, var_data_end_ptr, lr}
 
-    mov     r3, sp      @ save index array ptr
-
-    @ alloc mem for read
-    push    {r0, r1}
-
-    mov     r1, #4      @ number of channels (we always return rgba32)
-    mul     r0, r4, r5  @ w * h
+    @ calculate size
+    mov     r1, #4                                  @ num of channels
+    mul     r0, var_image_width, var_image_height   @ w * h
     mul     r0, r1, r0  @ 4 * dim
 
+    @ alloc mem for read
     bl      malloc
-    mov     r2, r0      @ r2 is now a data ptr
+    mov     var_decoded_ptr, r0
 
-    pop     {r0, r1}
-    push    {r2}        @ push on stack to save for later (r2 will be modified)
+    pop     {var_data_ptr, var_data_end_ptr, lr}
+    push    {var_decoded_ptr}   @ r2 will be advanced so store initial value
+
+    sub     sp, sp, #256                                        @ alloc index array on stack (64*4)
+    add     var_data_end_ptr, var_data_ptr, var_data_len        @ calculate end ptr
+    sub     var_data_end_ptr, var_data_end_ptr, #QOI_PADDING    @ - padding
+    mov     var_data_run, #0                                    @ current run (done here since r3 is free by now)
+    mov     var_index_array_ptr, sp                             @ save index array ptr (done here since r4 is free by now)
 
     loop:
-        ldr     r7, [r0]!
+        cmp     var_data_run, #0    @ check if run is 0
+        subne   var_data_run, #1    @ run --;
+        bne     loop_end
 
-        @ check if RGB
-        cmp     r7, #QOI_OP_RGB
+        ldrb    r11, [r0], #1
+
+        @ if QOI_OP_RGB
+        cmp     r11, #QOI_OP_RGB
         beq     rgb
 
-        @ check if RGBA
-        cmp     r7, #QOI_OP_RGBA
+        @ if QOI_OP_RGBA
+        cmp     r11, #QOI_OP_RGBA
         beq     rgba
 
-        and     r8, r7, #QOI_MASK2
+        and     r12, r11, #QOI_MASK2
 
-        @ check if INDEX
-        cmp     r8, #QOI_OP_INDEX
+        @ if QOI_OP_INDEX
+        cmp     r12, #QOI_OP_INDEX
+        beq     index
+
+        @ if QOI_OP_DIFF
+        cmp     r12, #QOI_OP_DIFF
+        beq     diff
+
+        @ if QOI_OP_LUMA
+        cmp     r12, #QOI_OP_LUMA
+        beq     luma
+
+        @ if QOI_OP_RUN
+        cmp     r12, #QOI_OP_RUN
         beq     index
 
         @ QOI_OP_RGB
         rgb:
-            cmp         r5, #3
-
-            @ this is taken when number of channels is 3
-            ldmeq       r0!, {r7, r8, r9}
-            moveq       r10, #0xFF
-
-            @ this when number of channels is 4
-            ldmne       r0!, {r7, r8, r9, r10}
+            ldrb        var_color_r, [var_data_ptr], #1  @ r
+            ldrb        var_color_g, [var_data_ptr], #1  @ g
+            ldrb        var_color_b, [var_data_ptr], #1  @ b
+            mov         var_color_a, #0xFF  @ a
 
             b           loop_end
 
         @ QOI_OP_RGBA
         rgba:
-            ldm         r0!, {r7, r8, r9, r10}
+            rgba_load   var_data_ptr
             b           loop_end
 
         @ QOI_OP_INDEX
         index:
-            add         r7, r7, r3  @ calculate address
-            ldm         r7, {r7, r8, r9, r10}
+            add         r11, r11, var_index_array_ptr
+            rgba_load   r11
+            b           loop_end
+
+        diff:
+            @ calculate r
+            mov         r11, r11, lsr #4
+            and         r11, r11, #0x03
+            sub         r11, r11, #2
+            add         var_color_r, var_color_r, r11
+
+            @ calculate g
+            mov         r11, r11, lsr #2
+            and         r11, r11, #0x03
+            sub         r11, r11, #2
+            add         var_color_r, var_color_r, r11
+
+            @ calculate b
+            and         r11, r11, #0x03
+            sub         r11, r11, #2
+            add         var_color_r, var_color_r, r11
+
+            b           loop_end
+
+        luma:
+            @ stub
+            ldrb        r11, [var_data_ptr], #1  @ just read for now
+            b           loop_end
+
+        @ QOI_OP_RUN
+        run:
+            and         var_data_run, r11, #0x3F
             b           loop_end
 
         loop_end:
-            stm     r2!, {r7, r8, r9, r10}
-            bl      qoi_color_hash
+            rgba_store  var_decoded_ptr
 
             @ store index
-            add     r11, r3, r12  @ calculate hash addr
-            stm     r11, { r7, r8, r9, r10 }
+            rgba_hash
+            add         r11, var_index_array_ptr, r12  @ calculate hash ptr
+            rgba_store  r11
 
-            subs    r4, r4, r5  @ px_len = px_len - channels
-            bne     loop
+            cmp         var_data_ptr, var_data_end_ptr
+            blo         loop
 
-        @ return stack back
-        pop     {r0}        @ pop the original data ptr
-        add     sp, sp, #64
+        add     sp, sp, #256
+        pop     {r0}    @ pop our decoded ptr and store in r0 (return)
         bx      lr
-
-
-@ direct port of QOI_COLOR_HASH macro with index wrapping built-in
-@ also we sin by using r12 as return value... not that we are following callconv anyways...
-qoi_color_hash:
-    mov     r11, #3
-    mul     r12, r11, r7     @ C.rgba.r*3
-
-    mov     r11, #5
-    mla     r12, r8, r11, r12 @ C.rgba.r*3 + C.rgba.g*5
-
-    mov     r11, #7
-    mla     r12, r9, r11, r12 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
-
-    mov     r11, #11
-    mla     r12, r10, r11, r12 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
-
-    and     r12, r12, #63   @ & (64 - 1)
-    bx      lr              @ r12 now holds the hash

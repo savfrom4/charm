@@ -1,4 +1,4 @@
 {
-    "C_Cpp.default.compileCommands": "/home/silk/Documents/armv5_translator/builddir/compile_commands.json",
+    "C_Cpp.default.compileCommands": "/home/silk/Documents/charm/builddir/compile_commands.json",
     "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild"
 }
