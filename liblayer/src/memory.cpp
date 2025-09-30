@@ -1,4 +1,4 @@
-#include "liblayer.hpp"
+#include "liblayer/liblayer.hpp"
 #include <cstring>
 #include <iostream>
 #include <mutex>
@@ -14,7 +14,7 @@ struct Block {
 
 namespace layer {
 
-inline uint32_t ExecutionState::memory_map(uintptr_t address) {
+inline uint32_t ExecutionState::address_map(uintptr_t address) {
   // stack
   if (address >= reinterpret_cast<uintptr_t>(stack) &&
       address < reinterpret_cast<uintptr_t>(stack) + LAYER_STACK_SIZE) {
@@ -32,7 +32,7 @@ inline uint32_t ExecutionState::memory_map(uintptr_t address) {
   return 0;
 }
 
-inline uintptr_t ExecutionState::memory_resolve(uint32_t address) {
+inline uintptr_t ExecutionState::address_resolve(uint32_t address) {
   // stack
   if (address >= LAYER_STACK_BASE &&
       address < LAYER_STACK_BASE + LAYER_STACK_SIZE) {
@@ -73,7 +73,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
 
   size = (size + 3) & ~3; // word-align
 
-  std::lock_guard lock{memory_mutex};
+  std::lock_guard lock{_memory_lock};
 
   // we iterate trying to find a free block
   uint8_t *ptr = memory;
@@ -157,7 +157,7 @@ void ExecutionState::memory_free(void *p) {
     return;
   }
 
-  std::lock_guard lock{memory_mutex};
+  std::lock_guard lock{_memory_lock};
   char *base = reinterpret_cast<char *>(p) - sizeof(Block);
 
   Block blk;

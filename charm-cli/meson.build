@@ -1,9 +1,9 @@
 executable(
   'charm-cli',
 
-  sources: [
+  sources: files(
     'main.cpp',
-  ],
+  ),
 
   dependencies: [libcharm_dep, liblayer_dep],
 )

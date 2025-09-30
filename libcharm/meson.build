@@ -6,12 +6,12 @@ libcharm = library(
     'external/ELFIO',
   ],
 
-  sources: [
+  sources: files(
     'src/arm.cpp',
     'src/recomp.cpp',
     'src/recomp_analysis.cpp',
     'src/recomp_emit.cpp',
-  ],
+  ),
 
   dependencies: [liblayer_dep],
 )

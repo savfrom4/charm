@@ -1,45 +1,50 @@
 #pragma once
+#include "conditions.hpp" // for condition code macros
+
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <type_traits>
+
+// -------------------------------------
+// ------------- OPTIONS ---------------
+// -------------------------------------
 
 #ifndef LAYER_STACK_BASE
 #define LAYER_STACK_BASE (0xC0000000) // Virtual address of stack pointer
-#endif
-
-#ifndef LAYER_STACK_SIZE
-#define LAYER_STACK_SIZE (1024 * 1024 * 4) // Size of the stack (4 MB)
 #endif
 
 #ifndef LAYER_MEMORY_BASE
 #define LAYER_MEMORY_BASE (0x10000000) // Virtual address of the memory
 #endif
 
+#ifndef LAYER_STACK_SIZE
+#define LAYER_STACK_SIZE (1024 * 1024 * 4) // Size of the stack (4 MB)
+#endif
+
 #ifndef LAYER_MEMORY_SIZE
 #define LAYER_MEMORY_SIZE (1024 * 1024 * 16) // Size of the memory (16 MB)
 #endif
 
-#ifdef LAYER_DEBUG
-#include <iostream>
-#define LAYER_LOG(fmt, ...)                                                    \
-  do {                                                                         \
-    std::cout << fmt << std::endl;                                             \
-  } while (0)
-#else
-#define LAYER_LOG(fmt, ...)                                                    \
-  do {                                                                         \
-  } while (0)
-#endif
+// -------------------------------------
+// ------------ DEBUGGING --------------
+// -------------------------------------
 
-/* Conditions */
-#include "conditions.hpp"
+#ifdef LAYER_DEBUG
+#define LAYER_DBE_STEPIN() _dbg.stepin()
+#define LAYER_DBE_BREAK() _dbg.send_break()
+#define LAYER_DBE_LOG(fmt, ...) _dbg.send(fmt, __VA_ARGS__)
+#else
+#define LAYER_DBE_STEPIN()
+#define LAYER_DBE_BREAK()
+#define LAYER_DBE_LOG(fmt, ...)
+#endif
 
 namespace layer {
 
 typedef uint8_t reg_idx_t;
 typedef uint32_t reg_value_t;
 
-// REGISTERS
 enum : reg_idx_t {
   R0 = 0,
   R1 = 1,
@@ -60,7 +65,21 @@ enum : reg_idx_t {
   REG_COUNT = 16,
 };
 
-struct Allocation {};
+class ExecutionState;
+
+// this class represents a connection to the debugger.
+class ExecutionDebugee {
+public:
+  ExecutionDebugee();
+  ~ExecutionDebugee();
+
+  void stepin(ExecutionState &ps);
+  void stepover(ExecutionState &ps);
+  void send(const std::string &fmt, ...);
+  void send_break();
+
+private:
+};
 
 class ExecutionState {
 public:
@@ -70,19 +89,20 @@ public:
       z;   /* zero */
 
   reg_value_t r[REG_COUNT] = {
-      0, 0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0, 0, LAYER_STACK_BASE + LAYER_STACK_SIZE - 1, // stack ptr
+      0, 0,
+      0, 0,
+      0, 0,
+      0, 0,
+      0, 0,
+      0, 0,
+      0, LAYER_STACK_BASE + LAYER_STACK_SIZE - 1, // stack pointer
       0, 0,
   };
 
-  uint8_t stack[LAYER_STACK_SIZE] = {0}; /* stack */
-  uint8_t *memory = nullptr;             /* memory */
+  uint8_t stack[LAYER_STACK_SIZE] = {0};            /* stack */
+  uint8_t *memory = new uint8_t[LAYER_MEMORY_SIZE]; /* memory */
 
-  inline ExecutionState() {
-    memory = new uint8_t[LAYER_MEMORY_SIZE];
-    memory_init();
-  }
-
+  inline ExecutionState() { memory_init(); }
   inline ~ExecutionState() { delete[] memory; }
 
   // Memory
@@ -91,37 +111,43 @@ public:
   void *memory_alloc(uint32_t size);
   void memory_free(void *p);
 
-  virtual uint32_t memory_map(uintptr_t address);
-  virtual uintptr_t memory_resolve(uint32_t address);
+  // Addressing
 
-  template <typename T> inline uint32_t memory_map(T address) {
+  template <typename T> inline uint32_t address_map(T address) {
     static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-    return memory_map(reinterpret_cast<uintptr_t>(address));
+    return address_map(reinterpret_cast<uintptr_t>(address));
   }
 
-  template <typename T> inline T memory_resolve(uint32_t address) {
+  template <typename T> inline T address_resolve(uint32_t address) {
     static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-    return reinterpret_cast<T>(memory_resolve(address));
+    return reinterpret_cast<T>(address_resolve(address));
   }
 
-  // armv4
+  virtual uint32_t address_map(uintptr_t address);
+  virtual uintptr_t address_resolve(uint32_t address);
 
-  void arm_add(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_adc(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_sub(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_mov(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_and(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_eor(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_orr(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_bic(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_tst(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_teq(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
-  void arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t imm);
+  // Dumping/restoring state from a file
+  void dump(const std::string &filename);
+  void restore(const std::string &filename);
+
+  // armv4.cpp
+
+  void arm_add(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_adc(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_sub(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_mov(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_and(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_eor(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_orr(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_bic(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_tst(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_teq(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
+  void arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn, reg_value_t op2_value);
 
   void arm_mul(bool s, reg_idx_t rd, reg_idx_t rn, reg_idx_t rs, reg_idx_t rm);
   void arm_mla(bool s, reg_idx_t rd, reg_idx_t rn, reg_idx_t rs, reg_idx_t rm);
@@ -132,28 +158,27 @@ public:
                 reg_idx_t rs, reg_idx_t rm);
 
   void arm_ldr(bool pre_indx, bool add, bool byte, bool write_back,
-               reg_idx_t rn, reg_idx_t rd, reg_value_t offset, bool copy);
+               reg_idx_t rn, reg_idx_t rd, reg_value_t offset);
   void arm_str(bool pre_indx, bool add, bool byte, bool write_back,
-               reg_idx_t rn, reg_idx_t rd, reg_value_t offset, bool copy);
+               reg_idx_t rn, reg_idx_t rd, reg_value_t offset);
   void arm_ldm(bool pre_indx, bool add, bool write_back, reg_idx_t rn,
-               reg_value_t reg_list, bool copy);
+               reg_value_t reg_list);
   void arm_stm(bool pre_indx, bool add, bool write_back, reg_idx_t rn,
-               reg_value_t reg_list, bool copy);
+               reg_value_t reg_list);
   void arm_ldrh(bool pre_indx, bool add, bool write_back, reg_idx_t rn,
-                reg_idx_t rd, uint8_t type, uint32_t offset);
+                reg_idx_t rd, uint8_t type, reg_value_t offset);
   void arm_strh(bool pre_indx, bool add, bool write_back, reg_idx_t rn,
-                reg_idx_t rd, uint8_t type, uint32_t offset);
+                reg_idx_t rd, uint8_t type, reg_value_t offset);
 
-  /* THUMB instructions */
-  // TODO: add thumb
+  // TODO: implement armv5, add thumbv1
 
 private:
-  std::mutex memory_mutex;
+// connection to the debugger is only present when LAYER_DEBUG is defined
+#ifdef LAYER_DEBUG
+  ExecutionDebugee _dbg;
+#endif
+
+  std::mutex _memory_lock;
 };
 
 } // namespace layer
-
-#ifdef LAYER_IMPLEMENTATION
-#include "armv4.cpp"  // ARMv4 (ARM instructions)
-#include "memory.cpp" // addressing / alloc / free
-#endif

@@ -25,7 +25,8 @@ private:
   void analyze_reloc_dyn();
   void analyze_exported_functions();
 
-  void emit_makefile(const std::string &output_dir);
+  void emit_meson_options(const std::string &output_dir);
+  void emit_meson_project(const std::string &output_dir);
   void emit_code_source(const std::string &output_dir);
   void emit_code_header(const std::string &output_dir);
   void emit_data_header(const std::string &output_dir);

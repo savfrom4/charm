@@ -61,7 +61,8 @@ void Recompiler::step_emit(const std::string &output_dir) {
     std::filesystem::create_symlink(liblayer_path, symlink_path);
   }
 
-  emit_makefile(output_dir);
+  emit_meson_options(output_dir);
+  emit_meson_project(output_dir);
 
   std::cout << "> Code ..." << std::endl;
   emit_code_header(output_dir);
@@ -72,55 +73,55 @@ void Recompiler::step_emit(const std::string &output_dir) {
   emit_data_source(output_dir);
 }
 
-void Recompiler::emit_makefile(const std::string &output_dir) {
-  auto makefile_path =
-      std::filesystem::path{std::filesystem::path{output_dir} / "Makefile"};
+void Recompiler::emit_meson_options(const std::string &output_dir) {
+  auto meson_options_path = std::filesystem::path{
+      std::filesystem::path{output_dir} / "meson_options.txt"};
 
-  if (std::filesystem::exists(makefile_path)) {
+  if (std::filesystem::exists(meson_options_path)) {
     return;
   }
 
-  std::ofstream ofs{makefile_path};
-
-  ofs << "CXX ?= c++" << std::endl;
-  ofs << "CXXFLAGS = -I. -Iliblayer/include -std=c++17 -flto -fPIC -w "
-         "$(MAKEOPT)"
-      << std::endl
+  std::ofstream ofs{meson_options_path};
+  ofs << "option('debug', type: 'boolean', value: false, "
+         "description: "
+         "'Enable debugging via charm-dbg')"
       << std::endl;
-
-  ofs << "SRCS = code.cpp data.cpp $(SCRSOPT)" << std::endl;
-  ofs << "OBJS = $(SRCS:.cpp=.o)" << std::endl;
-  ofs << "NAME = exec" << std::endl << std::endl;
-
-  ofs << "RELEASE ?= 1" << std::endl;
-  ofs << "SHARED ?= 0" << std::endl << std::endl;
-
-  ofs << "ifeq ($(RELEASE),0)" << std::endl
-      << "\tCXXFLAGS += -g -fsanitize=address" << std::endl
-      << "else" << std::endl
-      << "\tCXXFLAGS += -O3" << std::endl
-      << "endif" << std::endl
+  ofs << "option('library', type: 'boolean', value: true, description: "
+         "'Build as library')"
       << std::endl;
+}
 
-  ofs << "ifeq ($(SHARED),1)" << std::endl
-      << "\tCXXFLAGS += -shared" << std::endl
-      << "\tEXEC := $(NAME).so" << std::endl
-      << "else" << std::endl
-      << "\tEXEC := $(NAME)" << std::endl
-      << "endif" << std::endl
+void Recompiler::emit_meson_project(const std::string &output_dir) {
+  auto meson_project_path =
+      std::filesystem::path{std::filesystem::path{output_dir} / "meson.build"};
+
+  if (std::filesystem::exists(meson_project_path)) {
+    return;
+  }
+
+  std::ofstream ofs{meson_project_path};
+  ofs << "project('output')" << std::endl << std::endl;
+  ofs << "subdir('liblayer')" << std::endl << std::endl;
+
+  ofs << "include_directories = [ 'liblayer/include', '.' ]" << std::endl;
+  ofs << "sources = files('code.cpp', 'data.cpp')" << std::endl << std::endl;
+
+  ofs << "if get_option('LIBLAYER_DEBUG')" << std::endl;
+  ofs << "\tadd_project_arguments('-DLAYER_DEBUG', language : 'cpp')"
       << std::endl;
+  ofs << "endif" << std::endl << std::endl;
 
-  ofs << ".PHONY: all clean" << std::endl;
-  ofs << "all: $(EXEC)" << std::endl << std::endl;
-
-  ofs << "$(EXEC): $(OBJS)" << std::endl;
-  ofs << "\t$(CXX) $(CXXFLAGS) -o $@ $^" << std::endl << std::endl;
-
-  ofs << "%.o:%.cpp" << std::endl;
-  ofs << "\t$(CXX) $(CXXFLAGS) -c $< -o $@" << std::endl << std::endl;
-
-  ofs << "clean:" << std::endl;
-  ofs << "\trm -f $(OBJS) $(NAME) $(NAME).so" << std::endl;
+  ofs << "if get_option('library')" << std::endl;
+  ofs << "\toutput_dep = library('output', include_directories: "
+         "include_directories, sources: "
+         "sources)"
+      << std::endl;
+  ofs << "else" << std::endl;
+  ofs << "\toutput_dep = executable('output', include_directories: "
+         "include_directories, sources: "
+         "sources)"
+      << std::endl;
+  ofs << "endif" << std::endl;
 }
 
 void Recompiler::emit_code_header(const std::string &output_dir) {
@@ -139,8 +140,8 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
 
   ofs << "class ProgramState : public layer::ExecutionState {" << std::endl;
   ofs << "public:" << std::endl;
-  ofs << "\tuint32_t memory_map(uintptr_t addr) override;" << std::endl;
-  ofs << "\tuintptr_t memory_resolve(uint32_t addr) override;" << std::endl;
+  ofs << "\tuint32_t address_map(uintptr_t addr) override;" << std::endl;
+  ofs << "\tuintptr_t address_resolve(uint32_t addr) override;" << std::endl;
   ofs << "};" << std::endl << std::endl;
 
   ofs << "void eval(ProgramState& ps, uint32_t address);" << std::endl
@@ -372,13 +373,13 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
 }
 
 void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
-  ofs << "inline uint32_t ProgramState::memory_map(uintptr_t addr) {"
+  ofs << "inline uint32_t ProgramState::address_map(uintptr_t addr) {"
       << std::endl;
 
   ofs << std::hex;
 
   ofs << "\tuint32_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::memory_map(addr))) { return mapped; }"
+  ofs << "\tif((mapped = ExecutionState::address_map(addr))) { return mapped; }"
       << std::endl
       << std::endl;
 
@@ -403,11 +404,11 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
 
   ofs << "}" << std::endl << std::endl;
 
-  ofs << "inline uintptr_t ProgramState::memory_resolve(uint32_t addr) {"
+  ofs << "inline uintptr_t ProgramState::address_resolve(uint32_t addr) {"
       << std::endl;
 
   ofs << "\tuintptr_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::memory_resolve(addr))) { return "
+  ofs << "\tif((mapped = ExecutionState::address_resolve(addr))) { return "
          "mapped; }"
       << std::endl
       << std::endl;
