@@ -1,11 +1,9 @@
+#include "liblayer/debug.hpp"
 #include "liblayer/liblayer.hpp"
 #include <cstring>
-#include <iostream>
 #include <mutex>
-#include <ostream>
 
-#define BLOCK_SIZE (64)                         // Min allocation
-#define BLOCK_ITER (BLOCK_SIZE + sizeof(Block)) // + sizeof(Block)
+#define BLOCK_ITER (LAYER_MEMORY_BLOCK_SIZE + sizeof(Block)) // + sizeof(Block)
 
 struct Block {
   bool allocated;
@@ -15,18 +13,24 @@ struct Block {
 namespace layer {
 
 inline uint32_t ExecutionState::address_map(uintptr_t address) {
+  auto stack_ptr = stack.data();
+  auto memory_ptr = memory.data();
+
   // stack
-  if (address >= reinterpret_cast<uintptr_t>(stack) &&
-      address < reinterpret_cast<uintptr_t>(stack) + LAYER_STACK_SIZE) {
+  if (address >= reinterpret_cast<uintptr_t>(stack_ptr) &&
+      address < reinterpret_cast<uintptr_t>(stack_ptr) + LAYER_STACK_SIZE) {
     return LAYER_STACK_BASE +
-           static_cast<uint32_t>(address - reinterpret_cast<uintptr_t>(stack));
+           static_cast<uint32_t>(address -
+                                 reinterpret_cast<uintptr_t>(stack_ptr));
   }
 
   // memory
-  else if (address >= reinterpret_cast<uintptr_t>(memory) &&
-           address < reinterpret_cast<uintptr_t>(memory) + LAYER_MEMORY_SIZE) {
+  else if (address >= reinterpret_cast<uintptr_t>(memory_ptr) &&
+           address <
+               reinterpret_cast<uintptr_t>(memory_ptr) + LAYER_MEMORY_SIZE) {
     return LAYER_MEMORY_BASE +
-           static_cast<uint32_t>(address - reinterpret_cast<uintptr_t>(memory));
+           static_cast<uint32_t>(address -
+                                 reinterpret_cast<uintptr_t>(memory_ptr));
   }
 
   return 0;
@@ -49,11 +53,9 @@ inline uintptr_t ExecutionState::address_resolve(uint32_t address) {
 }
 
 void ExecutionState::memory_init() {
-  memset(memory, 0, LAYER_MEMORY_SIZE);
-
   const Block blk = {
       .allocated = false,
-      .size = BLOCK_SIZE,
+      .size = LAYER_MEMORY_BLOCK_SIZE,
   };
 
   for (uint32_t i = 0; i < LAYER_MEMORY_SIZE; i += BLOCK_ITER) {
@@ -64,6 +66,8 @@ void ExecutionState::memory_init() {
 
     memcpy(&memory[i], &blk, sizeof(blk));
   }
+
+  LAYER_DBE_LOG("memory initialized with ", 1);
 }
 
 void *ExecutionState::memory_alloc(uint32_t size) {
@@ -76,8 +80,8 @@ void *ExecutionState::memory_alloc(uint32_t size) {
   std::lock_guard lock{_memory_lock};
 
   // we iterate trying to find a free block
-  uint8_t *ptr = memory;
-  uint8_t *end = memory + LAYER_MEMORY_SIZE;
+  uint8_t *ptr = memory.data();
+  uint8_t *end = memory.data() + LAYER_MEMORY_SIZE;
 
   while (ptr < end) {
     Block blk;
@@ -94,7 +98,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
       int64_t diff = blk.size - size;
 
       // if its more than block sizes, split the block in two
-      if (diff >= BLOCK_SIZE) {
+      if (diff >= LAYER_MEMORY_BLOCK_SIZE) {
         uint8_t *next_blk_ptr = ptr + diff + sizeof(Block);
         const Block next_blk = {
             .allocated = false,
@@ -102,7 +106,6 @@ void *ExecutionState::memory_alloc(uint32_t size) {
         };
 
         memcpy(next_blk_ptr, &next_blk, sizeof(next_blk));
-
         blk.size -= diff;
       }
 
@@ -129,7 +132,6 @@ void *ExecutionState::memory_alloc(uint32_t size) {
       accumulated_size += next_blk.size;
       n++;
       if (accumulated_size >= size) {
-        std::cout << "fa" << std::endl;
         found = true;
         break;
       }
@@ -138,7 +140,6 @@ void *ExecutionState::memory_alloc(uint32_t size) {
     }
 
     if (found) {
-      std::cout << "ok" << std::endl;
       blk.size = accumulated_size + n * sizeof(Block);
       blk.allocated = true;
 

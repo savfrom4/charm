@@ -73,9 +73,9 @@ constexpr inline reg_value_t op2_ror(ExecutionState &ps, bool s,
   return (value >> amount) | (value << (32 - amount));
 }
 
-inline void ExecutionState::arm_add(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_add(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   if (s) {
     cs = __builtin_add_overflow(r[rn], imm, &r[rd]);
@@ -87,12 +87,12 @@ inline void ExecutionState::arm_add(bool s, reg_idx_t rd, reg_idx_t rn,
     r[rd] = r[rn] + imm;
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_adc(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_adc(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t operand = imm + cs;
   if (s) {
@@ -105,12 +105,12 @@ inline void ExecutionState::arm_adc(bool s, reg_idx_t rd, reg_idx_t rn,
     r[rd] = r[rn] + operand;
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_sub(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_sub(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   if (s) {
     cs = !__builtin_sub_overflow(r[rn], imm, &r[rd]);
@@ -122,12 +122,12 @@ inline void ExecutionState::arm_sub(bool s, reg_idx_t rd, reg_idx_t rn,
     r[rd] = r[rn] - imm;
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_sbc(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t operand = imm + !cs;
   if (s) {
@@ -140,12 +140,12 @@ inline void ExecutionState::arm_sbc(bool s, reg_idx_t rd, reg_idx_t rn,
     r[rd] = r[rn] - operand;
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_cmp(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   uint32_t result;
   cs = !__builtin_sub_overflow(r[rn], imm, &result);
@@ -154,12 +154,12 @@ inline void ExecutionState::arm_cmp(bool s, reg_idx_t rd, reg_idx_t rn,
   mi = (result >> 31) & 1;
   z = !result;
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_mov(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_mov(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   r[rd] = imm;
   if (s) {
@@ -167,12 +167,12 @@ inline void ExecutionState::arm_mov(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_rsb(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   if (s) {
     cs = !__builtin_sub_overflow(imm, r[rn], &r[rd]);
@@ -184,12 +184,12 @@ inline void ExecutionState::arm_rsb(bool s, reg_idx_t rd, reg_idx_t rn,
     r[rd] = imm - r[rn];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_rsc(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t operand = r[rn] + !cs;
 
@@ -203,12 +203,12 @@ inline void ExecutionState::arm_rsc(bool s, reg_idx_t rd, reg_idx_t rn,
     r[rd] = imm - operand;
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_and(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_and(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   r[rd] = r[rn] & imm;
 
@@ -217,12 +217,12 @@ inline void ExecutionState::arm_and(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_eor(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_eor(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   r[rd] = r[rn] ^ imm;
 
@@ -231,12 +231,12 @@ inline void ExecutionState::arm_eor(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_orr(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_orr(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   r[rd] = r[rn] | imm;
   if (s) {
@@ -244,12 +244,12 @@ inline void ExecutionState::arm_orr(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_bic(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_bic(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   r[rd] = r[rn] & ~imm;
   if (s) {
@@ -257,12 +257,12 @@ inline void ExecutionState::arm_bic(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_mvn(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   r[rd] = ~imm;
 
@@ -271,34 +271,34 @@ inline void ExecutionState::arm_mvn(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_tst(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_tst(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t result = r[rn] & imm;
   mi = (result >> 31) & 1;
   z = !result;
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_teq(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_teq(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t result = r[rn] ^ imm;
   mi = (result >> 31) & 1;
   z = !result;
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn,
+inline void ExecutionState::arm_cmn(bool s, Register rd, Register rn,
                                     reg_value_t imm) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t result;
   cs = __builtin_add_overflow(r[rn], imm, &result);
@@ -307,12 +307,12 @@ inline void ExecutionState::arm_cmn(bool s, reg_idx_t rd, reg_idx_t rn,
   mi = (result >> 31) & 1;
   z = !result;
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
-                                    reg_idx_t rs, reg_idx_t rm) {
-  LAYER_DBE_STEPIN();
+inline void ExecutionState::arm_mul(bool s, Register rd, Register rn,
+                                    Register rs, Register rm) {
+  LAYER_DBE_STEP_INTERN();
 
   if (UNLIKELY(rd == rm)) {
     LAYER_DBE_LOG("Warning: UNPREDICTABLE: Rd and Rm must be different!");
@@ -325,12 +325,12 @@ inline void ExecutionState::arm_mul(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
-                                    reg_idx_t rs, reg_idx_t rm) {
-  LAYER_DBE_STEPIN();
+inline void ExecutionState::arm_mla(bool s, Register rd, Register rn,
+                                    Register rs, Register rm) {
+  LAYER_DBE_STEP_INTERN();
 
   if (UNLIKELY(rd == rm)) {
     LAYER_DBE_LOG("Warning: UNPREDICTABLE: Rd and Rm must be different!");
@@ -342,13 +342,12 @@ inline void ExecutionState::arm_mla(bool s, reg_idx_t rd, reg_idx_t rn,
     z = !r[rd];
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_mull(bool s, bool sign, reg_idx_t rd_lo,
-                                     reg_idx_t rd_hi, reg_idx_t rm,
-                                     reg_idx_t rs) {
-  LAYER_DBE_STEPIN();
+inline void ExecutionState::arm_mull(bool s, bool sign, Register rd_lo,
+                                     Register rd_hi, Register rm, Register rs) {
+  LAYER_DBE_STEP_INTERN();
 
   uint64_t result;
   if (sign) {
@@ -367,13 +366,12 @@ inline void ExecutionState::arm_mull(bool s, bool sign, reg_idx_t rd_lo,
     z = (result == 0);
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
-inline void ExecutionState::arm_mlal(bool s, bool sign, reg_idx_t rd_lo,
-                                     reg_idx_t rd_hi, reg_idx_t rm,
-                                     reg_idx_t rs) {
-  LAYER_DBE_STEPIN();
+inline void ExecutionState::arm_mlal(bool s, bool sign, Register rd_lo,
+                                     Register rd_hi, Register rm, Register rs) {
+  LAYER_DBE_STEP_INTERN();
 
   uint64_t result;
   if (sign) {
@@ -395,13 +393,13 @@ inline void ExecutionState::arm_mlal(bool s, bool sign, reg_idx_t rd_lo,
     z = (acc == 0);
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
 inline void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
-                                    bool write_back, reg_idx_t rn, reg_idx_t rd,
+                                    bool write_back, Register rn, Register rd,
                                     reg_value_t offset) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
@@ -414,7 +412,7 @@ inline void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG("Error: resolved address is 0x00000000!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
 
     throw std::runtime_error("arm_ldr: resolved address is 0x00000000");
   }
@@ -426,7 +424,7 @@ inline void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
     memcpy(&r[rd], mem, sizeof(uint32_t));
   }
 
-  LAYER_DBE_LOG("Note: value read: 0x%x", r[rd]);
+  LAYER_DBE_LOG("Note: value read: 0x%X", r[rd]);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
@@ -435,16 +433,16 @@ inline void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%x", rn, r[rn]);
+    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
 inline void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
-                                    bool write_back, reg_idx_t rn, reg_idx_t rd,
+                                    bool write_back, Register rn, Register rd,
                                     reg_value_t offset) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t base = r[rn];
   reg_value_t value = r[rd];
@@ -462,7 +460,7 @@ inline void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG("Error: resolved address is 0x00000000!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
 
     throw std::runtime_error("arm_str: resolved address is 0x00000000");
   }
@@ -475,7 +473,7 @@ inline void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
     memcpy(mem, &value, sizeof(uint32_t));
   }
 
-  LAYER_DBE_LOG("Note: value wrote to %p: 0x%x", mem, value);
+  LAYER_DBE_LOG("Note: value wrote to %p: 0x%X", mem, value);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
@@ -484,16 +482,16 @@ inline void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%x", rn, r[rn]);
+    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
 inline void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
-                                     reg_idx_t rn, reg_idx_t rd, uint8_t type,
+                                     Register rn, Register rd, uint8_t type,
                                      uint32_t offset) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
@@ -506,7 +504,7 @@ inline void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG("Error: resolved address is 0x00000000!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
 
     throw std::runtime_error("arm_ldrh: resolved address is 0x00000000");
   }
@@ -514,7 +512,7 @@ inline void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   switch (type) {
   case 0b00:
     LAYER_DBE_LOG("Error: SWP is not implemented!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
     throw std::runtime_error("arm_ldrh: SWP is not implemented!");
 
   case 0b01: // LDRHR
@@ -535,7 +533,7 @@ inline void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
     break;
   }
 
-  LAYER_DBE_LOG("Note: value read: 0x%x", r[rd]);
+  LAYER_DBE_LOG("Note: value read: 0x%X", r[rd]);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
@@ -544,16 +542,16 @@ inline void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%x", rn, r[rn]);
+    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
 inline void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
-                                     reg_idx_t rn, reg_idx_t rd, uint8_t type,
+                                     Register rn, Register rd, uint8_t type,
                                      uint32_t offset) {
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t base = r[rn];
   reg_value_t value = r[rd];
@@ -573,7 +571,7 @@ inline void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG("Error: resolved address is 0x00000000!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
 
     throw std::runtime_error("arm_strh: resolved address is 0x00000000");
   }
@@ -581,7 +579,7 @@ inline void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
   switch (type) {
   case 0b00:
     LAYER_DBE_LOG("Error: SWP is not implemented!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
     throw std::runtime_error("arm_strh: SWP is not implemented!");
 
   case 0b01: // STRHR
@@ -597,7 +595,7 @@ inline void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
     break;
   }
 
-  LAYER_DBE_LOG("Note: value stored to %p: 0x%x", mem, r[rd]);
+  LAYER_DBE_LOG("Note: value stored to %p: 0x%X", mem, r[rd]);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
@@ -606,15 +604,15 @@ inline void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%x", rn, r[rn]);
+    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
 inline void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
-                                    reg_idx_t rn, reg_value_t reg_list) {
-  LAYER_DBE_STEPIN();
+                                    Register rn, reg_value_t reg_list) {
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t base = r[rn];
   reg_value_t n = __builtin_popcount(reg_list);
@@ -628,7 +626,7 @@ inline void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
 
   if (write_back) {
     r[rn] = add ? base + n * 4 : base - n * 4;
-    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%x", rn, r[rn]);
+    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
   LAYER_DBE_LOG("Note: virtual address: 0x%X", addr);
@@ -639,7 +637,7 @@ inline void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG("Error: resolved address is 0x00000000!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
 
     throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
   }
@@ -650,17 +648,17 @@ inline void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
     }
 
     memcpy(&r[i], mem, sizeof(uint32_t));
-    LAYER_DBE_LOG("Note: value read from %p: 0x%x", mem, r[i]);
-    LAYER_DBE_STEPIN();
+    LAYER_DBE_LOG("Note: value read from %p: 0x%X", mem, r[i]);
+    LAYER_DBE_STEP_INTERN();
     mem += 4;
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
 inline void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
-                                    reg_idx_t rn, reg_value_t reg_list) {
-  LAYER_DBE_STEPIN();
+                                    Register rn, reg_value_t reg_list) {
+  LAYER_DBE_STEP_INTERN();
 
   reg_value_t base = r[rn];
   reg_value_t n = __builtin_popcount(reg_list);
@@ -681,7 +679,7 @@ inline void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG("Error: resolved address is 0x00000000!");
-    LAYER_DBE_BREAK();
+    LAYER_DBE_REQUEST_PAUSE();
 
     throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
   }
@@ -692,8 +690,8 @@ inline void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
     }
 
     memcpy(mem, &r[i], sizeof(uint32_t));
-    LAYER_DBE_LOG("Note: value wrote to %p: 0x%x", mem, r[i]);
-    LAYER_DBE_STEPIN();
+    LAYER_DBE_LOG("Note: value wrote to %p: 0x%X", mem, r[i]);
+    LAYER_DBE_STEP_INTERN();
     mem += 4;
 
     if (!write_back || written) {
@@ -702,11 +700,11 @@ inline void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
 
     // We write-back now
     r[rn] = add ? base + n * 4 : base - n * 4;
-    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%x", rn, r[rn]);
+    LAYER_DBE_LOG("Note: wrote back to r%d: 0x%X", rn, r[rn]);
     written = true;
   }
 
-  LAYER_DBE_STEPIN();
+  LAYER_DBE_STEP_INTERN();
 }
 
 } // namespace layer
