@@ -1,5 +1,6 @@
 #pragma once
 #include "conditions.hpp" // for condition code macros
+#include "debug.hpp"      // for debugging support
 
 #include <cstdint>
 #include <mutex>
@@ -26,20 +27,6 @@
 #define LAYER_MEMORY_SIZE (1024 * 1024 * 16) // Size of the memory (16 MB)
 #endif
 
-// -------------------------------------
-// ------------ DEBUGGING --------------
-// -------------------------------------
-
-#ifdef LAYER_DEBUG
-#define LAYER_DBE_STEPIN() _dbg.stepin()
-#define LAYER_DBE_BREAK() _dbg.send_break()
-#define LAYER_DBE_LOG(fmt, ...) _dbg.send(fmt, __VA_ARGS__)
-#else
-#define LAYER_DBE_STEPIN()
-#define LAYER_DBE_BREAK()
-#define LAYER_DBE_LOG(fmt, ...)
-#endif
-
 namespace layer {
 
 typedef uint8_t reg_idx_t;
@@ -63,22 +50,6 @@ enum : reg_idx_t {
   LR = 14,
   PC = 15,
   REG_COUNT = 16,
-};
-
-class ExecutionState;
-
-// this class represents a connection to the debugger.
-class ExecutionDebugee {
-public:
-  ExecutionDebugee();
-  ~ExecutionDebugee();
-
-  void stepin(ExecutionState &ps);
-  void stepover(ExecutionState &ps);
-  void send(const std::string &fmt, ...);
-  void send_break();
-
-private:
 };
 
 class ExecutionState {
@@ -173,7 +144,7 @@ public:
   // TODO: implement armv5, add thumbv1
 
 private:
-// connection to the debugger is only present when LAYER_DEBUG is defined
+// connection to the debugger is only present when LAYER_DEBUG
 #ifdef LAYER_DEBUG
   ExecutionDebugee _dbg;
 #endif
