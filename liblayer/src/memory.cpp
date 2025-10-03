@@ -7,52 +7,57 @@
 
 struct Block {
   bool allocated;
-  uint32_t size;
+  std::uint32_t size;
 };
 
 namespace layer {
 
-inline uint32_t ExecutionState::address_map(uintptr_t address) {
+std::uint32_t ExecutionState::address_map(std::uintptr_t address) {
   auto stack_ptr = stack.data();
   auto memory_ptr = memory.data();
 
   // stack
-  if (address >= reinterpret_cast<uintptr_t>(stack_ptr) &&
-      address < reinterpret_cast<uintptr_t>(stack_ptr) + LAYER_STACK_SIZE) {
+  if (address >= reinterpret_cast<std::uintptr_t>(stack_ptr) &&
+      address <
+          reinterpret_cast<std::uintptr_t>(stack_ptr) + LAYER_STACK_SIZE) {
     return LAYER_STACK_BASE +
-           static_cast<uint32_t>(address -
-                                 reinterpret_cast<uintptr_t>(stack_ptr));
+           static_cast<std::uint32_t>(
+               address - reinterpret_cast<std::uintptr_t>(stack_ptr));
   }
 
   // memory
-  else if (address >= reinterpret_cast<uintptr_t>(memory_ptr) &&
-           address <
-               reinterpret_cast<uintptr_t>(memory_ptr) + LAYER_MEMORY_SIZE) {
+  else if (address >= reinterpret_cast<std::uintptr_t>(memory_ptr) &&
+           address < reinterpret_cast<std::uintptr_t>(memory_ptr) +
+                         LAYER_MEMORY_SIZE) {
     return LAYER_MEMORY_BASE +
-           static_cast<uint32_t>(address -
-                                 reinterpret_cast<uintptr_t>(memory_ptr));
+           static_cast<std::uint32_t>(
+               address - reinterpret_cast<std::uintptr_t>(memory_ptr));
   }
 
   return 0;
 }
 
-inline uintptr_t ExecutionState::address_resolve(uint32_t address) {
+std::uintptr_t ExecutionState::address_resolve(std::uint32_t address) {
   // stack
   if (address >= LAYER_STACK_BASE &&
       address < LAYER_STACK_BASE + LAYER_STACK_SIZE) {
-    return reinterpret_cast<uintptr_t>(&stack[address - LAYER_STACK_BASE]);
+    return reinterpret_cast<std::uintptr_t>(&stack[address - LAYER_STACK_BASE]);
   }
 
   // memory
   else if (address >= LAYER_MEMORY_BASE &&
            address < LAYER_MEMORY_BASE + LAYER_MEMORY_SIZE) {
-    return reinterpret_cast<uintptr_t>(&memory[address - LAYER_MEMORY_BASE]);
+    return reinterpret_cast<std::uintptr_t>(
+        &memory[address - LAYER_MEMORY_BASE]);
   }
 
   return 0;
 }
 
 void ExecutionState::memory_init() {
+  memory.resize(LAYER_MEMORY_SIZE);
+  std::memset(memory.data(), 0, LAYER_MEMORY_SIZE);
+
   const Block blk = {
       .allocated = false,
       .size = LAYER_MEMORY_BLOCK_SIZE,
@@ -64,10 +69,10 @@ void ExecutionState::memory_init() {
       break;
     }
 
-    memcpy(&memory[i], &blk, sizeof(blk));
+    std::memcpy(&memory[i], &blk, sizeof(blk));
   }
 
-  LAYER_DBE_LOG(*this, "Note: initialized %d bytes of memory.",
+  LAYER_DBE_LOG(*this, "Info: virtual memory size is %d bytes.",
                 LAYER_MEMORY_SIZE);
 }
 
@@ -86,7 +91,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
 
   while (ptr < end) {
     Block blk;
-    memcpy(&blk, ptr, sizeof(blk));
+    std::memcpy(&blk, ptr, sizeof(blk));
 
     if (blk.allocated) {
       ptr += blk.size + sizeof(blk);
@@ -106,12 +111,12 @@ void *ExecutionState::memory_alloc(uint32_t size) {
             .size = static_cast<uint32_t>(diff),
         };
 
-        memcpy(next_blk_ptr, &next_blk, sizeof(next_blk));
+        std::memcpy(next_blk_ptr, &next_blk, sizeof(next_blk));
         blk.size -= diff;
       }
 
       blk.allocated = true;
-      memcpy(ptr, &blk, sizeof(blk));
+      std::memcpy(ptr, &blk, sizeof(blk));
       return ptr + sizeof(blk);
     }
 
@@ -122,7 +127,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
 
     while (next_blk_ptr < end) {
       Block next_blk;
-      memcpy(&next_blk, next_blk_ptr, sizeof(next_blk));
+      std::memcpy(&next_blk, next_blk_ptr, sizeof(next_blk));
 
       // we hit a taken block
       if (next_blk.allocated) {
@@ -144,7 +149,7 @@ void *ExecutionState::memory_alloc(uint32_t size) {
       blk.size = accumulated_size + n * sizeof(Block);
       blk.allocated = true;
 
-      memcpy(ptr, &blk, sizeof(blk));
+      std::memcpy(ptr, &blk, sizeof(blk));
       return ptr + sizeof(blk);
     }
 
@@ -163,10 +168,10 @@ void ExecutionState::memory_free(void *p) {
   char *base = reinterpret_cast<char *>(p) - sizeof(Block);
 
   Block blk;
-  memcpy(&blk, base, sizeof(Block));
+  std::memcpy(&blk, base, sizeof(Block));
 
   blk.allocated = false;
-  memcpy(base, &blk, sizeof(Block));
+  std::memcpy(base, &blk, sizeof(Block));
 }
 
 } // namespace layer

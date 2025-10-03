@@ -2,7 +2,7 @@
 #include <array>
 #include <cstdint>
 #include <mutex>
-#include <string>
+#include <vector>
 
 // -------------------------------------
 // ------------- OPTIONS ---------------
@@ -82,8 +82,8 @@ public:
       0, 0,
   };
 
-  std::array<uint8_t, LAYER_STACK_SIZE> stack = {0};   /* stack */
-  std::array<uint8_t, LAYER_MEMORY_SIZE> memory = {0}; /* memory */
+  std::array<uint8_t, LAYER_STACK_SIZE> stack = {0}; /* stack */
+  std::vector<uint8_t> memory;                       /* memory */
 
   inline ExecutionState() { memory_init(); }
   inline virtual ~ExecutionState() {}
@@ -109,10 +109,6 @@ public:
 
   virtual std::uint32_t address_map(std::uintptr_t address);
   virtual std::uintptr_t address_resolve(std::uint32_t address);
-
-  // Dumping/restoring state from a file
-  void dump(const std::string &filename);
-  void restore(const std::string &filename);
 
   // armv4.cpp
 

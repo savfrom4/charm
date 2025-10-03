@@ -45,14 +45,14 @@ Debugee::Debugee(ExecutionState &ps) {
       .sin_zero = {0},
   };
 
-  if (!bind(_socket, (struct sockaddr *)&address, sizeof(address))) {
+  if (bind(_socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to bind socket.");
   }
 
   std::cout << "Waitng for debugger on port " << LAYER_DEBUG_PORT << "..."
             << std::endl;
 
-  if (!listen(_socket, 1)) {
+  if (listen(_socket, 1) < 0) {
     throw std::runtime_error(
         "ExecutionDebugee ctor: failed to listen on socket.");
   }
@@ -66,7 +66,8 @@ Debugee::Debugee(ExecutionState &ps) {
 
   // disable nagle's algorithm
   int one = 1;
-  if (!setsockopt(_connection, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one))) {
+  if (setsockopt(_connection, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) <
+      0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to set NODELAY.");
   }
 
