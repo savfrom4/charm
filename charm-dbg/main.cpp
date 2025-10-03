@@ -33,7 +33,7 @@ bool debugger_network_process(int connection,
 bool debugger_network_poll(int connection, int timeout);
 
 int main(int argc, char **argv) {
-  const std::string full_address = argc > 2 ? argv[1] : "127.0.0.1:6969";
+  const std::string full_address = argc > 1 ? argv[1] : "127.0.0.1:6969";
   const auto colon_location = full_address.find(':');
 
   if (colon_location == std::string::npos) {
@@ -167,15 +167,17 @@ void debugger_execute_command(int connection, const std::string &full_command,
     std::memcpy(temp_buffer_ptr, &type, sizeof(type));
     temp_buffer_ptr += sizeof(type);
 
-    const std::uint32_t address = std::stoul(arg, 0, 0);
-    std::memcpy(temp_buffer_ptr, &address, sizeof(address));
-    temp_buffer_ptr += sizeof(address);
+    std::uint32_t value = std::stoul(arg, 0, 0);
+    value = htonl(value);
+
+    std::memcpy(temp_buffer_ptr, &value, sizeof(value));
+    temp_buffer_ptr += sizeof(value);
     break;
   }
 
   case hasher("p"):
   case hasher("print"): {
-    layer::DebugCommand type = layer::DebugCommand::PRINT_REGISTER;
+    auto type = layer::DebugCommand::PRINT_REGISTER;
     std::uint32_t value = 0;
 
     switch (hasher(arg.c_str())) {
@@ -270,6 +272,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
       break;
     }
 
+    value = htonl(value);
     std::memcpy(temp_buffer_ptr, &value, sizeof(value));
     temp_buffer_ptr += sizeof(value);
     break;

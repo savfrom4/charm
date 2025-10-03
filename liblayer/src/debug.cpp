@@ -223,6 +223,7 @@ void Debugee::process_command() {
   case DebugCommand::BREAK: {
     std::uint32_t value;
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+    value = ntohl(value);
 
     if (_breakpoints.count(value)) {
       _breakpoints.erase(value);
@@ -270,6 +271,7 @@ void Debugee::process_command() {
   case DebugCommand::PRINT_AT_ADDRESS: {
     std::uint32_t value;
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+    value = ntohl(value);
 
     const std::uint8_t *ptr =
         reinterpret_cast<const std::uint8_t *>(_ps.address_resolve(value));
