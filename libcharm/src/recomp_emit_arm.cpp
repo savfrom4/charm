@@ -124,7 +124,7 @@ void Recompiler::emit_arm(std::ostream &os, const arm::Instruction &instr,
   }
 
   case arm::InstructionGroup::BRANCH_EXCHANGE:
-    os << "JUMP(ps.r[" << REGISTER_TABLE[(int)instr.branchex.rm] << ");"
+    os << "JUMP(ps.r[" << REGISTER_TABLE[(int)instr.branchex.rm] << "]);"
        << MINIFY_COMMENT(" /* bx */");
     break;
 
@@ -515,7 +515,7 @@ void Recompiler::emit_arm_modifies_pc(std::ostream &os,
   }
   }
 
-  os << "JUMP(ps.r[" << REGISTER_TABLE[(int)arm::Register::PC] << ");";
+  os << " JUMP(ps.r[" << REGISTER_TABLE[(int)arm::Register::PC] << "]);";
   os << MINIFY_COMMENT(" /* modifies pc */");
 }
 
