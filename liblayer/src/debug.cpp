@@ -1,6 +1,7 @@
 #include "liblayer/debug.hpp"
 #include "liblayer/execution_state.hpp"
 #include <arpa/inet.h>
+#include <asm-generic/socket.h>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <stdexcept>
+#include <string>
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -31,10 +33,9 @@ const std::array<size_t, (int)layer::DebugCommand::COUNT> COMMAND_SIZE_TABLE = {
 
 namespace layer {
 
-Debugee::Debugee(ExecutionState &ps) {
+Debugee::Debugee(ExecutionState &_ps) : _ps(_ps) {
   _socket = socket(AF_INET, SOCK_STREAM, 0);
-
-  if (!_socket) {
+  if (_socket < 0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to create socket.");
   }
 
@@ -45,11 +46,21 @@ Debugee::Debugee(ExecutionState &ps) {
       .sin_zero = {0},
   };
 
+  int one = 1;
+  if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0) {
+    throw std::runtime_error("ExecutionDebugee ctor: failed to set REUSEADDR.");
+  }
+
+  if (setsockopt(_socket, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one)) < 0) {
+    throw std::runtime_error(
+        "ExecutionDebugee ctor: failed to set SO_REUSEPORT.");
+  }
+
   if (bind(_socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to bind socket.");
   }
 
-  std::cout << "Waitng for debugger on port " << LAYER_DEBUG_PORT << "..."
+  std::cout << "> Waitng for debugger on port " << LAYER_DEBUG_PORT << "..."
             << std::endl;
 
   if (listen(_socket, 1) < 0) {
@@ -65,72 +76,78 @@ Debugee::Debugee(ExecutionState &ps) {
   }
 
   // disable nagle's algorithm
-  int one = 1;
   if (setsockopt(_connection, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) <
       0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to set NODELAY.");
   }
 
-  std::cout << "Connection established." << std::endl;
+  std::cout << "> Connection established!" << std::endl;
 
-  while (_flags & PAUSED)
-    process(ps, 1000); // wait for continue
+  stall();
+  send_format("> Executing...");
 }
 
 Debugee::~Debugee() {
-  if (_socket) {
+  send_format("> Reached program's end. Continuing will close the connection.");
+  send_paused();
+  stall();
+
+  if (_socket >= 0) {
     close(_socket);
   }
 
-  if (_connection) {
+  if (_connection >= 0) {
     close(_connection);
   }
 }
 
-void Debugee::step(ExecutionState &ps) {
-  if (_flags & STEP) {
-    _flags &= ~STEP; // clear flag
-    send_paused(ps);
+void Debugee::next() {
+  if (_flags & NEXT) {
+    _flags &= ~NEXT; // clear flag
+
+    send_message();
+    send_paused();
   }
 
-  while (_flags & PAUSED)
-    process(ps, 1000); // wait for continue
+  stall();
 }
 
-void Debugee::skip(ExecutionState &ps, const std::string &info) {
-  bool is_breakpoint = _breakpoints.count(ps.r[PC] - 8);
+void Debugee::skip() {
+  bool is_breakpoint = _breakpoints.count(_ps.r[PC] - 8);
 
   if (is_breakpoint || _flags & SKIP) {
     _flags &= ~SKIP; // clear flag
 
+    send_message();
+
     if (is_breakpoint) {
-      send_fmt("Breakpoint: %s", info);
-    } else {
-      send_fmt("%s", info);
+      send_format("Breakpoint hit.");
     }
 
-    send_paused(ps);
+    send_paused();
+  } else if (_flags & NEXT) {
+    send_message();
   }
 
-  while (_flags & PAUSED)
-    process(ps, 1000); // wait for continue
+  stall();
 }
 
-void Debugee::send_paused(ExecutionState &ps) {
+void Debugee::send_paused() {
   _flags |= PAUSED; // pause
 
   std::uint32_t length = 0; // sending length 0 is pause request
   write(_connection, &length, sizeof(length));
 }
 
-void Debugee::send_raw() {
+void Debugee::send_message() {
   auto temp_buffer_ptr = _temp_buffer.data();
 
-  std::uint32_t length = std::strlen(reinterpret_cast<char *>(temp_buffer_ptr));
-  length = htonl(length);
+  std::uint32_t length = std::strlen(temp_buffer_ptr);
+  std::memmove(temp_buffer_ptr + sizeof(length), temp_buffer_ptr, length + 1);
 
-  std::memmove(temp_buffer_ptr + sizeof(length), temp_buffer_ptr, length);
+  length = htonl(length);
   std::memcpy(temp_buffer_ptr, &length, sizeof(length));
+  length = ntohl(length);
 
   write(_connection, temp_buffer_ptr, length + sizeof(length));
 }
@@ -155,7 +172,7 @@ bool Debugee::poll(int timeout) {
   return (fd.revents & POLLIN);
 }
 
-void Debugee::process(ExecutionState &ps, int timeout) {
+void Debugee::process(int timeout) {
   auto temp_buffer_ptr = _temp_buffer.data();
 
   while (poll(timeout)) {
@@ -163,7 +180,7 @@ void Debugee::process(ExecutionState &ps, int timeout) {
         ::read(_connection, temp_buffer_ptr, sizeof(_temp_buffer));
 
     if (!bytes_read) {
-      throw std::runtime_error("Debugee::poll: connection is lost.");
+      throw std::runtime_error("Debugee::process: connection is lost.");
     }
 
     _accum_buffer.insert(_accum_buffer.end(), temp_buffer_ptr,
@@ -182,13 +199,18 @@ void Debugee::process(ExecutionState &ps, int timeout) {
       _accum_buffer.erase(_accum_buffer.begin());
     }
 
+    if ((int)_command >= COMMAND_SIZE_TABLE.size()) {
+      throw std::runtime_error("Debugee:process: invalid command type: " +
+                               std::to_string((int)_command));
+    }
+
     // not enough data
     const auto command_size = COMMAND_SIZE_TABLE[(int)_command];
     if (_accum_buffer.size() < command_size) {
       return;
     }
 
-    process_command(ps);
+    process_command();
 
     _accum_buffer.erase(_accum_buffer.begin(),
                         _accum_buffer.begin() + command_size);
@@ -196,7 +218,7 @@ void Debugee::process(ExecutionState &ps, int timeout) {
   }
 }
 
-void Debugee::process_command(ExecutionState &ps) {
+void Debugee::process_command() {
   switch (_command) {
   case DebugCommand::BREAK: {
     std::uint32_t value;
@@ -204,22 +226,24 @@ void Debugee::process_command(ExecutionState &ps) {
 
     if (_breakpoints.count(value)) {
       _breakpoints.erase(value);
-      send_fmt("Breakpoint at 0x%X removed.", value);
+      send_format("Breakpoint at 0x%X removed.", value);
       break;
     }
 
     _breakpoints.emplace(value);
-    send_fmt("Breakpoint at 0x%X set.", value);
+    send_format("Breakpoint at 0x%X set.", value);
     break;
   }
 
-  case DebugCommand::STEP: {
-    _flags |= STEP;
+  case DebugCommand::NEXT: {
+    _flags |= NEXT;
+    _flags &= ~PAUSED;
     break;
   }
 
   case layer::DebugCommand::SKIP: {
     _flags |= SKIP;
+    _flags &= ~PAUSED;
     break;
   }
 
@@ -239,7 +263,7 @@ void Debugee::process_command(ExecutionState &ps) {
     std::uint8_t value;
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 
-    send_fmt("r%d=0x%X (%d)", value, ps.r[value], ps.r[value]);
+    send_format("r%d=0x%X (%d)", value, _ps.r[value], _ps.r[value]);
     break;
   }
 
@@ -248,8 +272,8 @@ void Debugee::process_command(ExecutionState &ps) {
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 
     const std::uint8_t *ptr =
-        reinterpret_cast<const std::uint8_t *>(ps.address_resolve(value));
-    send_fmt("0x%X=0x%X (%d)", value, *ptr, *ptr);
+        reinterpret_cast<const std::uint8_t *>(_ps.address_resolve(value));
+    send_format("0x%X=0x%X (%d)", value, *ptr, *ptr);
     break;
   }
 
@@ -262,4 +286,8 @@ void Debugee::process_command(ExecutionState &ps) {
   }
 }
 
+void Debugee::stall() {
+  while (_flags & PAUSED)
+    process(30); // wait for continue
+}
 } // namespace layer

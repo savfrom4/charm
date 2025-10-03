@@ -4,4 +4,6 @@ executable(
   sources: files(
     'main.cpp',
   ),
+
+  dependencies: [liblayer_dep],
 )

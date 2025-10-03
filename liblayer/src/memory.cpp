@@ -72,8 +72,11 @@ void ExecutionState::memory_init() {
     std::memcpy(&memory[i], &blk, sizeof(blk));
   }
 
-  LAYER_DBE_LOG(*this, "Info: virtual memory size is %d bytes.",
-                LAYER_MEMORY_SIZE);
+  LAYER_DBE_LOG(*this, "virtual stack: begin 0x%X, end 0x%X", LAYER_STACK_BASE,
+                LAYER_STACK_BASE + LAYER_STACK_SIZE);
+
+  LAYER_DBE_LOG(*this, "virtual memory: begin 0x%X, end 0x%X",
+                LAYER_MEMORY_BASE, LAYER_MEMORY_BASE + LAYER_MEMORY_SIZE);
 }
 
 void *ExecutionState::memory_alloc(uint32_t size) {

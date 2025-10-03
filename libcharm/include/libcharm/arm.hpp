@@ -37,12 +37,12 @@ enum class Register : uint8_t {
 enum class Opcode : uint8_t {
   AND, /* logical and */
   EOR, /* logical exclusive or */
-  SUB, /* subtract (no carry) */
-  RSB, /* reverse subtract (no carry) */
+  SUB, /* substract (no carry) */
+  RSB, /* reverse substract (no carry) */
   ADD, /* add (no carry) */
   ADC, /* add (carry) */
-  SBC, /* subtract (carry) */
-  RSC, /* reverse subtract (carry) */
+  SBC, /* substract (carry) */
+  RSC, /* reverse substract (carry) */
   TST, /* test bits */
   TEQ, /* test eql */
   CMP, /* compare */
@@ -102,7 +102,7 @@ enum class HalfWordTransferType : uint8_t {
   SWP = 0b00, /* SWP */
   UHW = 0b01, /* Unsigned half-word */
   SB = 0b10,  /* Signed byte */
-  SHW = 0b11, /* Signed half-wrd */
+  SHW = 0b11, /* Signed half-word */
 };
 
 struct Shifter {
@@ -114,13 +114,16 @@ struct Shifter {
                            value or in a Rs register. */
 };
 
-struct Instruction {
+class Instruction {
 public:
   inline Instruction() {}
 
-  Condition cond = Condition::AL;
+  Condition condition = Condition::AL;
   InstructionGroup group = InstructionGroup::INVALID;
-  bool is_imm, set_flags;
+  bool immediate /*  is operand immediate or register? */,
+      set_cflags /* will set condition flags ? (not required by
+                    all instructions) */
+      ;
 
   union {
     struct {
@@ -130,7 +133,7 @@ public:
       union {
         Shifter op2_reg;
         uint32_t op2_imm;
-      };
+      }; // operand 2
     } data;
 
     struct {
@@ -139,23 +142,23 @@ public:
     } mul;
 
     struct {
-      bool accumulate, sign /* Unsigned (0) or Signed (1) */;
-      Register rd_hi, rd_lo; /* Low / high register to form a 32 bit value */
+      bool accumulate, sign /* unsigned (0) or signed (1) */;
+      Register rd_hi, rd_lo; /* low / high register to form a 32 bit value */
       Register rs, rm;
     } mul_long;
 
     struct {
-      bool pre_indx; /* Add offset after (0) or before (1) transfer? */
-      bool add;      /* Substract (0) or add (1) offset from base? */
+      bool pre_indx; /* add offset after (0) or before (1) transfer? */
+      bool add;      /* substract (0) or add (1) offset from base? */
       bool byte;
-      bool write_back; /* Write address into base? */
-      bool load;       /* Store (0) or Load (1)? */
+      bool write_back; /* write address into base? */
+      bool load;       /* store (0) or Load (1)? */
 
       Register rn, rd;
 
       union {
-        uint16_t offset_imm;
         Shifter offset_reg;
+        uint16_t offset_imm;
       };
     } data_trans;
 
@@ -169,8 +172,8 @@ public:
       HalfWordTransferType type;
 
       union {
+        Register offset_reg;
         uint8_t offset_imm;
-        Register rm;
       };
 
     } hw_data_trans;
@@ -193,15 +196,15 @@ public:
 
     struct {
       bool link;
-      int32_t offset;
+      int32_t offset; // NOTE: signed offset, be careful!
     } branch;
 
     struct {
       Register rm;
     } branchex;
-
-    arm::instr_t raw;
   };
+
+  instr_t raw; /* raw representation of the instruction */
 
   static Instruction decode(instr_t instr);
   void dump(std::ostream &str);

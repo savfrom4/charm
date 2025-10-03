@@ -2,20 +2,20 @@
 #include <libcharm/arm.hpp>
 #include <libcharm/recomp.hpp>
 
-const std::string VERSION = "0.01.10";
-const std::string RECOMP = "recomp";
-const std::string DUMP = "dump";
-const std::string MINIFY = "--minify";
+inline static const std::string VERSION = "0.2.0";
+inline static const std::string RECOMP = "recomp";
+inline static const std::string DUMP = "dump";
+inline static const std::string MINIFY = "--minify";
 
-void show_help();
+void help_show();
 void dump(const std::string &elf_exe, const std::string &dump_file);
-void dump_instructions(std::ofstream &ofs, ELFIO::section *section);
+void disassemble(std::ofstream &ofs, ELFIO::section *section);
 void dump_symtable(std::ofstream &ofs, ELFIO::elfio &elf,
                    ELFIO::section *section);
 
 int main(int argc, char **argv) {
   if (argc < 4) {
-    show_help();
+    help_show();
     return 1;
   }
 
@@ -33,27 +33,26 @@ int main(int argc, char **argv) {
   } else if (argv[1] == DUMP) {
     dump(argv[2], argv[3]);
   } else {
-    show_help();
+    help_show();
   }
 
   return 0;
 }
 
-void show_help() {
+void help_show() {
   std::cout << "charm-cli v" << VERSION
-            << " — A static ARM-to-C++ recompilation and analysis tool."
+            << " — A static ARM-to-C++ recompilation and disassembly tool."
             << std::endl;
   std::cout << "Licensed under the MIT License © 2025 sstochi and contributors."
             << std::endl
             << std::endl;
 
-  std::cout
-      << "Usage:\n"
-      << "\tcharm-cli [MODE] <elf_binary> <output> [function_address...]\n"
-      << std::endl;
+  std::cout << "Usage:\n"
+            << "\tcharm-cli <MODE> <elf_binary> <output>\n"
+            << std::endl;
 
   std::cout << "Modes:\n"
-            << "\trecomp\tRecompile the executable into C++ project.\n"
+            << "\trecomp\tRecompile the executable into a C++ meson project.\n"
             << "\tdump\tAnalyze the executable and dump instructions.\n"
             << std::endl;
 
@@ -71,9 +70,11 @@ void show_help() {
       << std::endl;
 
   std::cout << "Examples:\n"
-            << "\tcharm-cli recomp libfmath.so out/ --minify\n"
-            << "\tcharm-cli recomp libfoo.so build/\n"
-            << "\tcharm-cli dump libfoo.so dump.txt\n";
+            << "\tcharm-cli recomp libfoo.so build/ // standard elf executable "
+               "recompilation \n"
+            << "\tcharm-cli recomp libfmath.so out/ --minify // minified "
+               "recompilation \n"
+            << "\tcharm-cli dump libfoo.so dump.txt // dump instructions \n";
 }
 
 void dump(const std::string &elf_exe, const std::string &dump_file) {
@@ -102,16 +103,14 @@ void dump(const std::string &elf_exe, const std::string &dump_file) {
     return;
   }
 
-  dump_instructions(ofs, text);
-  dump_instructions(ofs, plt);
+  disassemble(ofs, text);
+  disassemble(ofs, plt);
 }
 
-void dump_instructions(std::ofstream &ofs, ELFIO::section *section) {
+void disassemble(std::ofstream &ofs, ELFIO::section *section) {
   ofs << "SECTION \"" << section->get_name() << "\" (addr 0x" << std::hex
       << section->get_address() << std::dec << ", size " << section->get_size()
       << "):" << std::endl;
-
-  // TODO: handle THUMB
 
   const char *data = section->get_data();
   size_t data_size = section->get_size() / sizeof(charm::arm::instr_t);

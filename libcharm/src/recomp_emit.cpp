@@ -528,8 +528,8 @@ void Recompiler::emit_code_section(std::ofstream &ofs,
     // debug information for instruction debugging
 
     if (!_minify) {
-      ss << "\t\t" << COND_TABLE[(int)instr.cond] << "(";
-      ss << "LAYER_DBE_SKIP(ps, \"0x" << std::hex << addr << ": ";
+      ss << "\t\t" << COND_TABLE[(int)instr.condition] << "(";
+      ss << "LAYER_DBE_SKIP(ps, \"%s\", \"0x" << std::hex << addr << ": ";
       instr.dump(ss);
       ss << "\"));" << std::endl;
     }
@@ -567,13 +567,13 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
     return;
   }
 
-  os << "\t\t" << COND_TABLE[(int)instr.cond] << "(";
+  os << "\t\t" << COND_TABLE[(int)instr.condition] << "(";
 
   switch (instr.group) {
   case arm::InstructionGroup::DATA_PROCESSING: {
-    if (instr.is_imm) {
+    if (instr.immediate) {
       os << OPCODE_TABLE[(int)instr.data.op] << "("
-         << (instr.set_flags ? "true" : "false")
+         << (instr.set_cflags ? "true" : "false")
          << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
          << REGISTER_TABLE[(int)instr.data.rd]
@@ -589,7 +589,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
     if (instr.data.op2_reg.is_reg) {
       os << OPCODE_TABLE[(int)instr.data.op] << "("
-         << (instr.set_flags ? "true" : "false")
+         << (instr.set_cflags ? "true" : "false")
          << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
          << REGISTER_TABLE[(int)instr.data.rd]
@@ -599,7 +599,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
          << MINIFY_COMMENT_COMMA(" /* rn */, ")
 
          << SHIFT_TABLE[(int)instr.data.op2_reg.type] << "(ps, "
-         << (instr.set_flags ? "true" : "false") << ", ps.r["
+         << (instr.set_cflags ? "true" : "false") << ", ps.r["
 
          << REGISTER_TABLE[(int)instr.data.op2_reg.rm] << "]"
          << MINIFY_COMMENT_COMMA(" /* rm */, ")
@@ -609,7 +609,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
     } else {
       os << OPCODE_TABLE[(int)instr.data.op] << "("
-         << (instr.set_flags ? "true" : "false")
+         << (instr.set_cflags ? "true" : "false")
          << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
          << REGISTER_TABLE[(int)instr.data.rd]
@@ -619,7 +619,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
          << MINIFY_COMMENT_COMMA(" /* rn */, ")
 
          << SHIFT_TABLE[(int)instr.data.op2_reg.type] << "(ps, "
-         << (instr.set_flags ? "true" : "false") << ", ps.r["
+         << (instr.set_cflags ? "true" : "false") << ", ps.r["
 
          << REGISTER_TABLE[(int)instr.data.op2_reg.rm] << "]"
          << MINIFY_COMMENT_COMMA(" /* rm */, ")
@@ -657,7 +657,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
   case arm::InstructionGroup::MULTIPLY:
     os << (instr.mul.accumulate ? "ps.arm_mla" : "ps.arm_mul") << "("
-       << (instr.set_flags ? "true" : "false")
+       << (instr.set_cflags ? "true" : "false")
        << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
        << REGISTER_TABLE[(int)instr.mul.rd]
@@ -675,7 +675,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
   case arm::InstructionGroup::MULTIPLY_LONG:
     os << (instr.mul_long.accumulate ? "ps.arm_mlal" : "ps.arm_mull") << "("
-       << (instr.set_flags ? "true" : "false")
+       << (instr.set_cflags ? "true" : "false")
        << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
 
        << (instr.mul_long.sign ? "true" : "false")
@@ -766,7 +766,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
 
     os << std::hex;
 
-    if (instr.is_imm) {
+    if (instr.immediate) {
       os << "0x" << (int)instr.data_trans.offset_imm
          << MINIFY_COMMENT(" /* offset */");
     } else {
@@ -858,11 +858,11 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
        << "0x" << std::hex << (int)instr.hw_data_trans.type
        << MINIFY_COMMENT_COMMA(" /* type */, ");
 
-    if (instr.is_imm) {
+    if (instr.immediate) {
       os << "0x" << (int)instr.hw_data_trans.offset_imm
          << MINIFY_COMMENT(" /* offset */");
     } else {
-      os << REGISTER_TABLE[(int)instr.hw_data_trans.rm]
+      os << REGISTER_TABLE[(int)instr.hw_data_trans.offset_reg]
          << MINIFY_COMMENT(" /* rm */");
     }
 

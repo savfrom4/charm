@@ -9,8 +9,8 @@ const std::array<std::string, (int)charm::arm::Opcode::COUNT> OPCODE_TABLE = {
 
 const std::array<std::string, (int)charm::arm::Register::COUNT> REGISTER_TABLE =
     {
-        "r0", "r1", "r2",  "r3",  "r4",  "r5", "r6", "r7",
-        "r8", "r9", "r10", "r11", "r12", "sp", "lr", "pc",
+        "r0", "r1", "r2",  "r3",  "r4", "r5", "r6", "r7",
+        "r8", "r9", "r10", "r11", "ip", "sp", "lr", "pc",
 };
 
 const std::array<std::string, 4> SHIFT_TABLE = {
@@ -42,7 +42,7 @@ namespace charm::arm {
 Instruction Instruction::decode(instr_t instr) {
   Instruction info;
   info.raw = instr;
-  info.cond = static_cast<Condition>(get_bits<28, 4>(instr));
+  info.condition = static_cast<Condition>(get_bits<28, 4>(instr));
 
   switch (get_bits<26, 2>(instr)) {
   // maybe data transfer
@@ -52,6 +52,7 @@ Instruction Instruction::decode(instr_t instr) {
     // multiply / multiply long / single data swap
     case 0b1001: {
       std::uint32_t type = get_bits<23, 5>(instr);
+
       if (!type) {
         info.decode_multiply(instr);
       } else if (type == 0b00001) {
@@ -67,6 +68,7 @@ Instruction Instruction::decode(instr_t instr) {
     case 0b0001: {
       if (get_bits<4, 22>(instr) == 0b0100101111111111110001) {
         info.decode_branchex(instr);
+        return info;
       }
       break;
     }
@@ -76,8 +78,10 @@ Instruction Instruction::decode(instr_t instr) {
     if (!get_bits<25>(instr) && get_bits<7>(instr) && get_bits<4>(instr)) {
       if (get_bits<22>(instr)) { // immediate
         info.decode_halfword_data_transfer(instr, true);
+        return info;
       } else if (!get_bits<8, 4>(instr)) { // register
         info.decode_halfword_data_transfer(instr, false);
+        return info;
       }
 
       break;
@@ -123,19 +127,19 @@ Instruction Instruction::decode(instr_t instr) {
 inline void Instruction::decode_data_processing(instr_t instr) {
   group = InstructionGroup::DATA_PROCESSING;
 
-  is_imm = get_bits<25>(instr); /* Immediate, bit 25 */
+  immediate = get_bits<25>(instr); /* Immediate, bit 25 */
 
   data.op =
       static_cast<Opcode>(get_bits<21, 4>(instr)); /* Opcode, bits 21-24 */
 
-  set_flags = get_bits<20>(instr); /* Set condition flags, bit 20 */
+  set_cflags = get_bits<20>(instr); /* Set condition flags, bit 20 */
   data.rn = static_cast<Register>(
       get_bits<16, 4>(instr)); /* Rn register, bits 16-19 */
   data.rd = static_cast<Register>(
       get_bits<12, 4>(instr)); /* Rd register, bits 12-15 */
 
   // Operand 2
-  if (is_imm) {
+  if (immediate) {
     std::uint32_t rotate =
         get_bits<8, 4>(instr); /* Amount to rotate by, bits 8-11 */
 
@@ -153,7 +157,7 @@ inline void Instruction::decode_multiply(instr_t instr) {
   group = InstructionGroup::MULTIPLY;
 
   mul.accumulate = get_bits<21>(instr); /* Accumulate, bit 21 */
-  set_flags = get_bits<20>(instr);      /* Set condition flags, bit 20 */
+  set_cflags = get_bits<20>(instr);     /* Set condition flags, bit 20 */
 
   mul.rd = static_cast<Register>(
       get_bits<16, 4>(instr)); /* Rd register, bits 16-19 */
@@ -171,7 +175,7 @@ inline void Instruction::decode_multiply_long(instr_t instr) {
 
   mul_long.sign = get_bits<22>(instr);       /* Unsigned, bit 22 */
   mul_long.accumulate = get_bits<21>(instr); /* Accumulate, bit 21 */
-  set_flags = get_bits<20>(instr);           /* Set condition flags, bit 20 */
+  set_cflags = get_bits<20>(instr);          /* Set condition flags, bit 20 */
 
   mul_long.rd_hi = static_cast<Register>(
       get_bits<16, 4>(instr)); /* RdHi register, bits 16-19 */
@@ -218,7 +222,7 @@ inline void Instruction::decode_branchex(instr_t instr) {
 inline void Instruction::decode_single_data_transfer(instr_t instr) {
   group = InstructionGroup::SINGLE_DATA_TRANSFER;
 
-  is_imm = !get_bits<25>(instr);               /* Immediate, bit 25 */
+  immediate = !get_bits<25>(instr);            /* Immediate, bit 25 */
   data_trans.pre_indx = get_bits<24>(instr);   /* Pre/Post indexing, bit 24 */
   data_trans.add = get_bits<23>(instr);        /* Up/Down, bit 23 */
   data_trans.byte = get_bits<22>(instr);       /* Byte/Word, bit 22 */
@@ -231,7 +235,7 @@ inline void Instruction::decode_single_data_transfer(instr_t instr) {
   data_trans.rd = static_cast<Register>(
       get_bits<12, 4>(instr)); /* Rd src/dst register, bits 12-15 */
 
-  if (is_imm) {
+  if (immediate) {
     data_trans.offset_imm = get_bits<0, 12>(instr);
   } else {
     decode_shift(instr, data_trans.offset_reg);
@@ -255,7 +259,7 @@ inline void Instruction::decode_halfword_data_transfer(instr_t instr,
   hw_data_trans.type = static_cast<decltype(hw_data_trans.type)>(
       get_bits<5, 2>(instr)); /* Type, bits 5-6 */
 
-  is_imm = imm;
+  immediate = imm;
   if (imm) {
     uint8_t offt_low = static_cast<uint16_t>(
         get_bits<0, 4>(instr)); /* Imm offset Low, bits 0-3 */
@@ -265,7 +269,7 @@ inline void Instruction::decode_halfword_data_transfer(instr_t instr,
     hw_data_trans.offset_imm =
         static_cast<uint8_t>((offt_high << 4) | offt_low);
   } else {
-    hw_data_trans.rm =
+    hw_data_trans.offset_reg =
         static_cast<Register>(get_bits<0, 4>(instr)); /* Rm, bits 0-3 */
   }
 }
@@ -309,7 +313,7 @@ inline void Instruction::decode_shift(instr_t instr, Shifter &shift) {
 }
 
 void Instruction::dump(std::ostream &ofs) {
-  ofs << "(" << COND_TABLE[(int)cond] << ") ";
+  ofs << "(" << COND_TABLE[(int)condition] << ") ";
 
   switch (group) {
   case InstructionGroup::DATA_PROCESSING: {
@@ -317,7 +321,7 @@ void Instruction::dump(std::ostream &ofs) {
     ofs << REGISTER_TABLE[(int)data.rd] << ", " << REGISTER_TABLE[(int)data.rn]
         << ", ";
 
-    if (is_imm) {
+    if (immediate) {
       ofs << "#" << (uint32_t)data.op2_imm;
     } else {
       ofs << REGISTER_TABLE[(int)data.op2_reg.rm];
@@ -392,7 +396,7 @@ void Instruction::dump(std::ostream &ofs) {
       ofs << "]";
     }
 
-    if (is_imm) {
+    if (immediate) {
       if (data_trans.offset_imm != 0)
         ofs << ", #" << (data_trans.add ? "" : "-")
             << (uint32_t)data_trans.offset_imm;
@@ -450,20 +454,6 @@ void Instruction::dump(std::ostream &ofs) {
       break;
     }
 
-    if (is_imm) {
-      ofs << ", #" << (data_trans.add ? "" : "-")
-          << (uint32_t)data_trans.offset_imm;
-    } else {
-      ofs << ", " << REGISTER_TABLE[(int)data_trans.offset_reg.rm];
-      if (data_trans.offset_reg.amount_or_rs != 0) {
-        ofs << ", " << SHIFT_TABLE[(int)data_trans.offset_reg.type] << " ";
-        if (data_trans.offset_reg.is_reg) {
-          ofs << REGISTER_TABLE[data_trans.offset_reg.amount_or_rs];
-        } else {
-          ofs << "#" << (int)data_trans.offset_reg.amount_or_rs;
-        }
-      }
-    }
     break;
   }
 
@@ -498,11 +488,11 @@ void Instruction::dump(std::ostream &ofs) {
     ofs << " " << REGISTER_TABLE[(int)hw_data_trans.rd] << ", [";
     ofs << REGISTER_TABLE[(int)hw_data_trans.rn];
 
-    if (is_imm) {
+    if (immediate) {
       if (hw_data_trans.offset_imm != 0)
         ofs << ", #" << (uint32_t)hw_data_trans.offset_imm;
     } else {
-      ofs << ", " << REGISTER_TABLE[(int)hw_data_trans.rm];
+      ofs << ", " << REGISTER_TABLE[(int)hw_data_trans.offset_reg];
     }
 
     ofs << "]";

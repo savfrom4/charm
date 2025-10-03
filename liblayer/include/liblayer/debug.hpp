@@ -18,13 +18,20 @@
 // defines because debug context isn't always available (when LAYER_DEBUG is not
 // set, for example)
 #ifdef LAYER_DEBUG
-#define LAYER_DBE_STEP(ps) (ps).dbe.step(ps)
-#define LAYER_DBE_SKIP(ps, info) (ps).dbe.skip(ps, info)
-#define LAYER_DBE_LOG(ps, fmt, ...) (ps).dbe.send_fmt(fmt, __VA_ARGS__)
-#define LAYER_DBE_SEND_PAUSED(ps) (ps).dbe.send_paused(ps)
+#define LAYER_DBE_NEXT(ps, fmt, ...)                                           \
+  (ps).dbe.format(fmt, __VA_ARGS__);                                           \
+  (ps).dbe.next();
+
+#define LAYER_DBE_SKIP(ps, fmt, ...)                                           \
+  (ps).dbe.format(fmt, __VA_ARGS__);                                           \
+  (ps).dbe.skip();
+
+#define LAYER_DBE_LOG(ps, fmt, ...) (ps).dbe.send_format(fmt, __VA_ARGS__)
+
+#define LAYER_DBE_SEND_PAUSED(ps) (ps).dbe.send_paused()
 #else
-#define LAYER_DBE_STEP(ps)
-#define LAYER_DBE_SKIP(ps, info)
+#define LAYER_DBE_NEXT(ps, fmt, ...)
+#define LAYER_DBE_SKIP(ps, fmt, ...)
 #define LAYER_DBE_LOG(ps, fmt, ...)
 #define LAYER_DBE_SEND_PAUSED(ps)
 #endif
@@ -37,7 +44,7 @@ class ExecutionState;
 enum class DebugCommand : std::uint8_t {
   NONE,
   BREAK,            // set/remove breakpoint
-  STEP,             // skip to next step (either instruction or internal)
+  NEXT,             // skip to next step (either instruction or internal)
   SKIP,             // skip to next instruction
   PAUSE_MODE,       // set pause mode (pause/continue)
   PRINT_REGISTER,   // dump register
@@ -56,20 +63,27 @@ public:
   // these two functions are called either each instruction or inside
   // instruction impl
   // if STEP or SKIP set respectively, they shall set PAUSE flag.
-  void step(ExecutionState &ps);
-  void skip(ExecutionState &ps, const std::string &info);
+  void next();
+  void skip();
 
   template <typename... Args>
-  inline void send_fmt(const std::string &fmt, Args... args) {
+  inline void send_format(const std::string &fmt, Args... args) {
+    format(fmt, args...);
+    send_message();
+  }
+
+  template <typename... Args>
+  inline void format(const std::string &fmt, Args... args) {
     std::memset(_temp_buffer.data(), 0, _temp_buffer.size());
     std::snprintf(reinterpret_cast<char *>(_temp_buffer.data()),
                   _temp_buffer.size(), fmt.c_str(), args...);
-    send_raw();
   }
 
-  void send_paused(ExecutionState &ps);
+  void send_message();
+  void send_paused();
 
 private:
+  ExecutionState &_ps;
   int _socket = -1, _connection = -1;
   DebugCommand _command =
       DebugCommand::NONE; /* current command (to index into size array) */
@@ -80,22 +94,20 @@ private:
     NONE = 0,
     PAUSED = 1 << 0, // when set, public process_* call will stall and wait
                      // for continue cmd from debugger
-    STEP = 1 << 1,   // when set, will execute until
+    NEXT = 1 << 1,   // when set, will execute until next
     SKIP = 1 << 2,
   };
   std::uint32_t _flags = PAUSED;
 
-  std::array<std::uint8_t, 1024>
-      _temp_buffer; /* temp buffer used for various opeartions, such as read,
-                      snpritnf, etc... */
-  std::vector<std::uint8_t>
-      _accum_buffer; /* fill with data, then read packet */
+  std::array<char, 512> _temp_buffer = {
+      0}; /* temp buffer used for various opeartions, such as read,
+      snpritnf, etc... */
+  std::vector<char> _accum_buffer; /* fill with data, then read packet */
 
-  void send_raw();
-
+  void stall();
   bool poll(int timeout);
-  void process(ExecutionState &ps, int timeout);
-  void process_command(ExecutionState &ps);
+  void process(int timeout);
+  void process_command();
 };
 
 } // namespace layer
