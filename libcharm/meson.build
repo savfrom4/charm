@@ -11,6 +11,7 @@ libcharm = library(
     'src/recomp.cpp',
     'src/recomp_analysis.cpp',
     'src/recomp_emit.cpp',
+    'src/recomp_emit_arm.cpp',
   ),
 )
 

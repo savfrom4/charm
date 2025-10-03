@@ -187,20 +187,6 @@ inline void Instruction::decode_multiply_long(instr_t instr) {
       static_cast<Register>(get_bits<0, 4>(instr)); /* Rm register, bits 0-3 */
 }
 
-// 4.12 Single Data Swap (SWP)
-inline void Instruction::decode_single_data_swap(instr_t instr) {
-  group = InstructionGroup::SINGLE_DATA_SWAP;
-
-  data_swap.byte = get_bits<22>(instr); /* Byte/Word, bit 22  */
-
-  data_swap.rn = static_cast<Register>(
-      get_bits<16, 4>(instr)); /* Rn base register, bits 16-19 */
-  data_swap.rd = static_cast<Register>(
-      get_bits<12, 4>(instr)); /* Rd dst register, bits 12-15 */
-  data_swap.rm = static_cast<Register>(
-      get_bits<0, 4>(instr)); /* Rm src register, bits 0-3 */
-}
-
 // 4.4 Branch and Branch with Link (B, BL)
 inline void Instruction::decode_branch(instr_t instr) {
   group = InstructionGroup::BRANCH;
@@ -216,6 +202,20 @@ inline void Instruction::decode_branchex(instr_t instr) {
   group = InstructionGroup::BRANCH_EXCHANGE;
 
   branchex.rm = static_cast<Register>(get_bits<0, 4>(instr)); /* Rn, bit 24 */
+}
+
+// 4.12 Single Data Swap (SWP)
+inline void Instruction::decode_single_data_swap(instr_t instr) {
+  group = InstructionGroup::SINGLE_DATA_SWAP;
+
+  data_swap.byte = get_bits<22>(instr); /* Byte/Word, bit 22  */
+
+  data_swap.rn = static_cast<Register>(
+      get_bits<16, 4>(instr)); /* Rn base register, bits 16-19 */
+  data_swap.rd = static_cast<Register>(
+      get_bits<12, 4>(instr)); /* Rd dst register, bits 12-15 */
+  data_swap.rm = static_cast<Register>(
+      get_bits<0, 4>(instr)); /* Rm src register, bits 0-3 */
 }
 
 // 4.9 Single Data Transfer (LDR, STR)

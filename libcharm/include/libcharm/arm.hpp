@@ -82,8 +82,8 @@ enum class InstructionGroup : uint8_t {
   MULTIPLY_LONG,
   SINGLE_DATA_SWAP,
   BRANCH_EXCHANGE,
-  HALFWORD_DATA_TRANSFER,
   SINGLE_DATA_TRANSFER,
+  HALFWORD_DATA_TRANSFER,
   BLOCK_DATA_TRANSFER,
   BRANCH,
   SWI,
@@ -213,12 +213,12 @@ private:
   void decode_data_processing(instr_t instr);
   void decode_multiply(instr_t instr);
   void decode_multiply_long(instr_t instr);
-  void decode_single_data_transfer(instr_t instr);
-  void decode_single_data_swap(instr_t instr);
   void decode_branch(instr_t instr);
   void decode_branchex(instr_t instr);
-  void decode_block_data_transfer(instr_t instr);
+  void decode_single_data_swap(instr_t instr);
+  void decode_single_data_transfer(instr_t instr);
   void decode_halfword_data_transfer(instr_t instr, bool imm);
+  void decode_block_data_transfer(instr_t instr);
   void decode_swi(instr_t instr);
 
   void decode_shift(instr_t instr, Shifter &shift);

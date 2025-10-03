@@ -12,6 +12,7 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <type_traits>
 #include <unistd.h>
 #include <vector>
 
@@ -20,6 +21,22 @@ const std::string VERSION = "1.0.0";
 constexpr std::size_t hasher(const char *str, std::size_t hash = 5381) {
   return *str ? hasher(str + 1, (hash * 33) ^ static_cast<unsigned char>(*str))
               : hash;
+}
+
+template <typename T>
+inline void buffer_write(std::array<char, 512> &buffer, std::uintptr_t &offset,
+                         T value) {
+  static_assert(std::is_enum_v<T> || std::is_integral_v<T>,
+                "buffer_write: T must be an enum or an integer.");
+
+  if constexpr (sizeof(value) == sizeof(std::uint16_t)) {
+    value = htons(value);
+  } else if constexpr (sizeof(value) == sizeof(std::uint32_t)) {
+    value = htonl(value);
+  }
+
+  std::memcpy(buffer.data() + offset, &value, sizeof(value));
+  offset += sizeof(value);
 }
 
 void help_show();
@@ -144,12 +161,16 @@ void debugger_start(struct addrinfo *info) {
 void debugger_execute_command(int connection, const std::string &full_command,
                               bool &paused,
                               std::array<char, 512> &temp_buffer) {
-  auto temp_buffer_ptr = temp_buffer.data();
-  const auto command = full_command.substr(0, full_command.find(' '));
-  const auto arg = full_command.substr(full_command.find(' ') + 1);
-  const auto command_hash = hasher(command.c_str());
+  std::uintptr_t buffer_offset = 0;
+  const auto split_location = full_command.find(' ');
+  const auto command = full_command.substr(0, split_location);
 
-  switch (command_hash) {
+  std::string arg;
+  if (split_location != std::string::npos) {
+    arg = full_command.substr(split_location + 1);
+  }
+
+  switch (hasher(command.c_str())) {
   case hasher("h"):
   case hasher("help"): {
     std::cout << "break(b) <address>" << std::endl;
@@ -163,72 +184,64 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
   case hasher("b"):
   case hasher("break"): {
-    const auto type = layer::DebugCommand::BREAK;
-    std::memcpy(temp_buffer_ptr, &type, sizeof(type));
-    temp_buffer_ptr += sizeof(type);
-
-    std::uint32_t value = std::stoul(arg, 0, 0);
-    value = htonl(value);
-
-    std::memcpy(temp_buffer_ptr, &value, sizeof(value));
-    temp_buffer_ptr += sizeof(value);
+    buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::BREAK);
+    buffer_write(temp_buffer, buffer_offset, std::stoul(arg, 0, 0));
     break;
   }
 
   case hasher("p"):
   case hasher("print"): {
-    auto type = layer::DebugCommand::PRINT_REGISTER;
+    layer::DebugCommand type = layer::DebugCommand::PRINT_REGISTER;
     std::uint32_t value = 0;
 
     switch (hasher(arg.c_str())) {
-    case hasher("r0"): {
+    case hasher("r0"):
       value = 0;
       break;
-    }
-    case hasher("r1"): {
+
+    case hasher("r1"):
       value = 1;
       break;
-    }
-    case hasher("r2"): {
+
+    case hasher("r2"):
       value = 2;
       break;
-    }
-    case hasher("r3"): {
+
+    case hasher("r3"):
       value = 3;
       break;
-    }
-    case hasher("r4"): {
+
+    case hasher("r4"):
       value = 4;
       break;
-    }
-    case hasher("r5"): {
+
+    case hasher("r5"):
       value = 5;
       break;
-    }
-    case hasher("r6"): {
+
+    case hasher("r6"):
       value = 6;
       break;
-    }
-    case hasher("r7"): {
+
+    case hasher("r7"):
       value = 7;
       break;
-    }
-    case hasher("r8"): {
+
+    case hasher("r8"):
       value = 8;
       break;
-    }
-    case hasher("r9"): {
+
+    case hasher("r9"):
       value = 9;
       break;
-    }
-    case hasher("r10"): {
+
+    case hasher("r10"):
       value = 10;
       break;
-    }
-    case hasher("r11"): {
+
+    case hasher("r11"):
       value = 11;
       break;
-    }
 
     case hasher("r12"):
     case hasher("ip"): {
@@ -262,49 +275,29 @@ void debugger_execute_command(int connection, const std::string &full_command,
     }
     }
 
-    std::memcpy(temp_buffer_ptr, &type, sizeof(type));
-    temp_buffer_ptr += sizeof(type);
-
-    if (type == layer::DebugCommand::PRINT_REGISTER) {
-      std::uint8_t v = value;
-      std::memcpy(temp_buffer_ptr, &v, sizeof(v));
-      temp_buffer_ptr += sizeof(v);
-      break;
-    }
-
-    value = htonl(value);
-    std::memcpy(temp_buffer_ptr, &value, sizeof(value));
-    temp_buffer_ptr += sizeof(value);
+    buffer_write(temp_buffer, buffer_offset, type);
+    buffer_write(temp_buffer, buffer_offset, value);
     break;
   }
 
   case hasher("c"):
   case hasher("continue"): {
-    const auto type = layer::DebugCommand::PAUSE_MODE;
-    std::memcpy(temp_buffer_ptr, &type, sizeof(type));
-    temp_buffer_ptr += sizeof(type);
-
-    const std::uint8_t value = false;
-    std::memcpy(temp_buffer_ptr, &value, sizeof(value));
-    temp_buffer_ptr += sizeof(value);
+    buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::PAUSE_MODE);
+    buffer_write(temp_buffer, buffer_offset, (std::uint8_t)false);
     paused = false;
     break;
   }
 
   case hasher("n"):
   case hasher("next"): {
-    const auto type = layer::DebugCommand::NEXT;
-    std::memcpy(temp_buffer_ptr, &type, sizeof(type));
-    temp_buffer_ptr += sizeof(type);
+    buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::NEXT);
     paused = false;
     break;
   }
 
   case hasher("s"):
   case hasher("skip"): {
-    const auto type = layer::DebugCommand::SKIP;
-    std::memcpy(temp_buffer_ptr, &type, sizeof(type));
-    temp_buffer_ptr += sizeof(type);
+    buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::SKIP);
     paused = false;
     break;
   }
@@ -323,7 +316,16 @@ void debugger_execute_command(int connection, const std::string &full_command,
   }
   }
 
-  ::write(connection, temp_buffer.data(), temp_buffer_ptr - temp_buffer.data());
+  while (buffer_offset > 0) {
+    ssize_t bytes_written =
+        write(connection, temp_buffer.data(), buffer_offset);
+
+    if (!bytes_written) {
+      throw std::runtime_error("debugger_execute_command: connection is lost.");
+    }
+
+    buffer_offset -= bytes_written;
+  }
 }
 
 bool debugger_network_process(int connection,
@@ -334,8 +336,7 @@ bool debugger_network_process(int connection,
   auto temp_buffer_ptr = temp_buffer.data();
 
   while (debugger_network_poll(connection, timeout)) {
-    ssize_t bytes_read =
-        ::read(connection, temp_buffer_ptr, sizeof(temp_buffer));
+    ssize_t bytes_read = read(connection, temp_buffer_ptr, sizeof(temp_buffer));
 
     if (!bytes_read) {
       throw std::runtime_error("debugger_network_process: connection is lost.");
@@ -371,15 +372,18 @@ bool debugger_network_process(int connection,
       break;
     }
 
+    // read buffer
     std::string buffer;
     buffer.resize(length);
     std::memcpy(buffer.data(), accum_buffer.data(), length);
     accum_buffer.erase(accum_buffer.begin(), accum_buffer.begin() + length);
 
-    std::cout << buffer << std::endl;
-    std::cout.flush();
+    // reset length for later read
     length = 0;
     result = true;
+
+    std::cout << buffer << std::endl;
+    std::cout.flush();
   }
 
   return result;

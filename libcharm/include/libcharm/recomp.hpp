@@ -4,6 +4,10 @@
 #include <string>
 #include <unordered_map>
 
+// to automatically exclude comments
+#define MINIFY_COMMENT(x) (_minify ? "" : x)
+#define MINIFY_COMMENT_COMMA(x) (_minify ? "," : x)
+
 namespace charm::recomp {
 
 struct Function {
@@ -27,26 +31,62 @@ private:
 
   void emit_meson_options(const std::string &output_dir);
   void emit_meson_project(const std::string &output_dir);
-  void emit_code_source(const std::string &output_dir);
-  void emit_code_header(const std::string &output_dir);
+
+  /* Code level */
+
   void emit_data_header(const std::string &output_dir);
   void emit_data_source(const std::string &output_dir);
+  void emit_code_source(const std::string &output_dir);
+  void emit_code_header(const std::string &output_dir);
+
+  /* Section level */
 
   void emit_code_address_mappings(std::ofstream &ofs);
   void emit_code_stubs(std::ofstream &ofs);
   void emit_code_section(std::ofstream &ofs, const ELFIO::section *section);
-  void emit_code_arm(std::ostream &os, const arm::Instruction &instr,
-                     arm::addr_t address);
+
+  /* Instruction level */
+
+  void emit_arm(std::ostream &os, const arm::Instruction &instr,
+                arm::addr_t address);
+  void emit_arm_data_processing(std::ostream &os, const arm::Instruction &instr,
+                                arm::addr_t address);
+  void emit_arm_multiply(std::ostream &os, const arm::Instruction &instr,
+                         arm::addr_t address);
+  void emit_arm_multiply_long(std::ostream &os, const arm::Instruction &instr,
+                              arm::addr_t address);
+  void emit_arm_branch(std::ostream &os, const arm::Instruction &instr,
+                       arm::addr_t address);
+  void emit_arm_single_data_transfer(std::ostream &os,
+                                     const arm::Instruction &instr,
+                                     arm::addr_t address);
+  void emit_arm_halfword_data_transfer(std::ostream &os,
+                                       const arm::Instruction &instr,
+                                       arm::addr_t address);
+
+  void emit_arm_block_data_transfer(std::ostream &os,
+                                    const arm::Instruction &instr,
+                                    arm::addr_t address);
+
+  // checks if instruction modifies pc
+  void emit_arm_modifies_pc(std::ostream &os, const arm::Instruction &instr,
+                            arm::addr_t address);
 
   template <typename... Args>
-  void emit_code_invalid(std::ostream &os, const arm::Instruction &instr,
-                         arm::addr_t address, const char *fmt, Args... args) {
+  void emit_arm_invalid(std::ostream &os, const arm::Instruction &instr,
+                        arm::addr_t address, const char *fmt, Args... args) {
     char buffer[512] = {0};
     snprintf(buffer, 512, fmt, args...);
 
     os << std::hex << "throw std::runtime_error(\"" << buffer << " (addr = 0x"
        << address << ", raw=0x" << instr.raw << ")\")";
   }
+
+  /* Utils */
+
+  std::string symbol_name_map(const std::string &symbol);
+  bool section_is_data(const ELFIO::section *section);
+  bool section_is_code(const ELFIO::section *section);
 
   bool _minify;
   ELFIO::elfio _elf;

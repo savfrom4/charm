@@ -23,7 +23,7 @@ const std::array<size_t, (int)layer::DebugCommand::COUNT> COMMAND_SIZE_TABLE = {
     0,                     // STEP
     0,                     // SKIP
     sizeof(std::uint8_t),  // PAUSE_MODE (8-bit boolean)
-    sizeof(std::uint8_t),  // PRINT_REGISTER (8-bit register index)
+    sizeof(std::uint32_t), // PRINT_REGISTER (8-bit register index)
     sizeof(std::uint32_t), // PRINT_AT_ADDRESS (32-bit imm address)
     sizeof(std::uint32_t), // DUMP (32-bit imm filename length + n bytes of
                            // string)
@@ -127,6 +127,7 @@ void Debugee::skip() {
     send_paused();
   } else if (flags & NEXT) {
     send_message();
+    send_paused();
   }
 
   stall();
