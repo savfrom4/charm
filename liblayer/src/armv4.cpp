@@ -351,11 +351,12 @@ void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
 
-  LAYER_DBE_LOG(*this, "virtual address: 0x%X", addr);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
+                   addr);
 
   const void *mem = reinterpret_cast<const void *>(address_resolve(addr));
 
-  LAYER_DBE_LOG(*this, "resolved to: %p", mem);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
@@ -374,17 +375,18 @@ void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
   // for big endian, both word and byte transfers need to be swapped
   r[rd] = BESWAP32(r[rd]);
 
-  LAYER_DBE_LOG(*this, "value read: 0x%X", r[rd]);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value read: 0x%X", r[rd]);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
     if (UNLIKELY(r[rn] == PC)) {
-      LAYER_DBE_LOG(*this, "%s",
-                    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
+      LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s",
+                       "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG(*this, "wrote back to r%d: 0x%X", rn, r[rn]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
   LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -405,7 +407,8 @@ void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
     value += 4;
   }
 
-  LAYER_DBE_LOG(*this, "virtual address: 0x%X", addr);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
+                   addr);
 
   void *mem = reinterpret_cast<void *>(address_resolve(addr));
 
@@ -416,7 +419,7 @@ void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
     throw std::runtime_error("arm_str: resolved address is 0x00000000");
   }
 
-  LAYER_DBE_LOG(*this, "resolved to: %p", mem);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
   // for big endian, we swap the value to make sure its stored as little-endian
   value = BESWAP32(value);
@@ -427,17 +430,19 @@ void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
     memcpy(mem, &value, sizeof(uint32_t));
   }
 
-  LAYER_DBE_LOG(*this, "value wrote to %p: 0x%X", mem, value);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value wrote to %p: 0x%X",
+                   mem, value);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
     if (UNLIKELY(r[rn] == PC)) {
-      LAYER_DBE_LOG(*this, "%s",
-                    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
+      LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s",
+                       "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG(*this, "wrote back to r%d: 0x%X", rn, r[rn]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
   LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -451,11 +456,12 @@ void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   reg_value_t base = r[rn];
   reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
 
-  LAYER_DBE_LOG(*this, "virtual address: 0x%X", addr);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
+                   addr);
 
   const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
 
-  LAYER_DBE_LOG(*this, "resolved to: %p", mem);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
@@ -491,17 +497,18 @@ void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   // for big endian, both word and byte transfers need to be swapped
   r[rd] = BESWAP32(r[rd]);
 
-  LAYER_DBE_LOG(*this, "value read: 0x%X", r[rd]);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value read: 0x%X", r[rd]);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
     if (UNLIKELY(r[rn] == PC)) {
-      LAYER_DBE_LOG(*this, "%s",
-                    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
+      LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s",
+                       "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG(*this, "wrote back to r%d: 0x%X", rn, r[rn]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
   LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -522,11 +529,12 @@ void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
     value += 4;
   }
 
-  LAYER_DBE_LOG(*this, "virtual address: 0x%X", addr);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
+                   addr);
 
   char *mem = reinterpret_cast<char *>(address_resolve(addr));
 
-  LAYER_DBE_LOG(*this, "resolved to: %p", mem);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
@@ -557,17 +565,19 @@ void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
     break;
   }
 
-  LAYER_DBE_LOG(*this, "value stored to %p: 0x%X", mem, r[rd]);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value stored to %p: 0x%X",
+                   mem, r[rd]);
 
   if (write_back || !pre_indx) {
     // SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
     if (UNLIKELY(r[rn] == PC)) {
-      LAYER_DBE_LOG(*this, "%s",
-                    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
+      LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s",
+                       "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
     }
 
     r[rn] = base + (add ? offset : -offset);
-    LAYER_DBE_LOG(*this, "wrote back to r%d: 0x%X", rn, r[rn]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
   LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -589,14 +599,16 @@ void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
 
   if (write_back) {
     r[rn] = add ? base + n * 4 : base - n * 4;
-    LAYER_DBE_LOG(*this, "wrote back to r%d: 0x%X", rn, r[rn]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "wrote back to r%d: 0x%X", rn, r[rn]);
   }
 
-  LAYER_DBE_LOG(*this, "virtual address: 0x%X", addr);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
+                   addr);
 
   const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
 
-  LAYER_DBE_LOG(*this, "resolved to: %p", mem);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
@@ -610,13 +622,16 @@ void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
       continue;
     }
 
-    LAYER_DBE_NEXT(*this, "%s: before write", __func__);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s: before write",
+                     __func__);
 
     memcpy(&r[i], mem, sizeof(uint32_t));
     r[i] = BESWAP32(r[i]);
-    LAYER_DBE_LOG(*this, "value read from %p: 0x%X", mem, r[i]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "value read from %p: 0x%X", mem, r[i]);
 
-    LAYER_DBE_NEXT(*this, "%s: after write", __func__);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s: after write",
+                     __func__);
     mem += 4;
   }
 
@@ -637,12 +652,13 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
     addr = pre_indx ? base - n * 4 : base - 4;
   }
 
-  LAYER_DBE_LOG(*this, "virtual address: 0x%X", addr);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
+                   addr);
 
   char *mem = reinterpret_cast<char *>(address_resolve(addr));
   bool written = false;
 
-  LAYER_DBE_LOG(*this, "resolved to: %p", mem);
+  LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
@@ -659,7 +675,8 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
     LAYER_DBE_NEXT(*this, "%s: before write", __func__);
 
     memcpy(mem, &r[i], sizeof(uint32_t));
-    LAYER_DBE_LOG(*this, "value wrote to %p: 0x%X", mem, r[i]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "value wrote to %p: 0x%X", mem, r[i]);
     LAYER_DBE_NEXT(*this, "%s: after write", __func__);
     mem += 4;
 
@@ -669,7 +686,8 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
 
     // We write-back now
     r[rn] = add ? base + n * 4 : base - n * 4;
-    LAYER_DBE_LOG(*this, "wrote back to r%d: 0x%X", rn, r[rn]);
+    LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
+                     "wrote back to r%d: 0x%X", rn, r[rn]);
     written = true;
   }
 

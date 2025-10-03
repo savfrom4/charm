@@ -27,12 +27,17 @@
   (ps).dbe.skip();
 
 #define LAYER_DBE_LOG(ps, fmt, ...) (ps).dbe.send_format(fmt, __VA_ARGS__)
+#define LAYER_DBE_LOG_IF(ps, cond, fmt, ...)                                   \
+  if ((cond)) {                                                                \
+    (ps).dbe.send_format(fmt, __VA_ARGS__);                                    \
+  }
 
 #define LAYER_DBE_SEND_PAUSED(ps) (ps).dbe.send_paused()
 #else
 #define LAYER_DBE_NEXT(ps, fmt, ...)
 #define LAYER_DBE_SKIP(ps, fmt, ...)
 #define LAYER_DBE_LOG(ps, fmt, ...)
+#define LAYER_DBE_LOG_IF(ps, cond, fmt, ...)
 #define LAYER_DBE_SEND_PAUSED(ps)
 #endif
 
@@ -57,6 +62,14 @@ enum class DebugCommand : std::uint8_t {
 // debugee is a tcp listener that's used by charm-dbg
 class Debugee {
 public:
+  enum {
+    NONE = 0,
+    PAUSED = 1 << 0,
+    NEXT = 1 << 1,
+    SKIP = 1 << 2,
+  };
+  std::uint32_t flags = PAUSED;
+
   Debugee(ExecutionState &ps);
   ~Debugee();
 
@@ -89,15 +102,6 @@ private:
       DebugCommand::NONE; /* current command (to index into size array) */
 
   std::unordered_set<std::uint32_t> _breakpoints;
-
-  enum {
-    NONE = 0,
-    PAUSED = 1 << 0, // when set, public process_* call will stall and wait
-                     // for continue cmd from debugger
-    NEXT = 1 << 1,   // when set, will execute until next
-    SKIP = 1 << 2,
-  };
-  std::uint32_t _flags = PAUSED;
 
   std::array<char, 512> _temp_buffer = {
       0}; /* temp buffer used for various opeartions, such as read,

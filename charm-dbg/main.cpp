@@ -318,7 +318,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
   }
 
   default: {
-    std::cout << "> Unrecognized command: \"" << command << "\"!" << std::endl;
+    std::cout << "> Unknown command: \"" << command << "\"!" << std::endl;
     return;
   }
   }

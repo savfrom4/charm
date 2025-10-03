@@ -102,8 +102,8 @@ Debugee::~Debugee() {
 }
 
 void Debugee::next() {
-  if (_flags & NEXT) {
-    _flags &= ~NEXT; // clear flag
+  if (flags & NEXT) {
+    flags &= ~NEXT; // clear flag
 
     send_message();
     send_paused();
@@ -115,8 +115,8 @@ void Debugee::next() {
 void Debugee::skip() {
   bool is_breakpoint = _breakpoints.count(_ps.r[PC] - 8);
 
-  if (is_breakpoint || _flags & SKIP) {
-    _flags &= ~SKIP; // clear flag
+  if (is_breakpoint || flags & SKIP) {
+    flags &= ~SKIP; // clear flag
 
     send_message();
 
@@ -125,7 +125,7 @@ void Debugee::skip() {
     }
 
     send_paused();
-  } else if (_flags & NEXT) {
+  } else if (flags & NEXT) {
     send_message();
   }
 
@@ -133,7 +133,7 @@ void Debugee::skip() {
 }
 
 void Debugee::send_paused() {
-  _flags |= PAUSED; // pause
+  flags |= PAUSED; // pause
 
   std::uint32_t length = 0; // sending length 0 is pause request
   write(_connection, &length, sizeof(length));
@@ -237,14 +237,14 @@ void Debugee::process_command() {
   }
 
   case DebugCommand::NEXT: {
-    _flags |= NEXT;
-    _flags &= ~PAUSED;
+    flags |= NEXT;
+    flags &= ~PAUSED;
     break;
   }
 
   case layer::DebugCommand::SKIP: {
-    _flags |= SKIP;
-    _flags &= ~PAUSED;
+    flags |= SKIP;
+    flags &= ~PAUSED;
     break;
   }
 
@@ -253,9 +253,9 @@ void Debugee::process_command() {
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 
     if (value) {
-      _flags |= PAUSED;
+      flags |= PAUSED;
     } else {
-      _flags &= ~PAUSED;
+      flags &= ~PAUSED;
     }
     break;
   }
@@ -289,7 +289,7 @@ void Debugee::process_command() {
 }
 
 void Debugee::stall() {
-  while (_flags & PAUSED)
+  while (flags & PAUSED)
     process(30); // wait for continue
 }
 } // namespace layer

@@ -196,12 +196,13 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
   ofs << "#define INSTR(ADDR) case ADDR: a##ADDR: ps.r[PC] = ADDR+8;"
       << std::endl;
   ofs << "#define EXPORT(name, address) __attribute__((weak)) void "
-         "name (ProgramState& ps) {ps.r[LR] = INSTR_RETURN_LR; "
-         "eval(ps, address);}"
+         "name (ProgramState& ps) { LAYER_DBE_LOG(ps, \"%s\", \"external "
+         "call: \" #name); "
+         "ps.r[LR] = INSTR_RETURN_LR; "
+         "eval(ps, address); }"
       << std::endl;
   ofs << "#define STUB(name) __attribute__((weak)) void "
-         "name (ProgramState& ps) { LAYER_DBE_LOG(ps, \"%s\", \"Note: "
-         "unimplemented "
+         "name (ProgramState& ps) { LAYER_DBE_LOG(ps, \"%s\", \"unimplemented "
          "stub: \" #name); }"
       << std::endl;
   ofs << "using namespace layer;" << std::endl;
