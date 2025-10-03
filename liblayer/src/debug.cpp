@@ -1,6 +1,8 @@
 #include "liblayer/debug.hpp"
+#include "liblayer/execution_state.hpp"
 #include <arpa/inet.h>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
@@ -13,10 +15,11 @@
 #include <unistd.h>
 
 // NOTE: excludes 1 byte header
-const size_t PACKET_SIZE_TABLE[(int)layer::DebugCommand::COUNT] = {
+const std::array<size_t, (int)layer::DebugCommand::COUNT> COMMAND_SIZE_TABLE = {
     0,
     sizeof(std::uint32_t), // BREAK (32-bit imm address)
-    sizeof(std::uint8_t),  // STEP_MODE (8-bit boolean)
+    0,                     // STEP
+    0,                     // SKIP
     sizeof(std::uint8_t),  // PAUSE_MODE (8-bit boolean)
     sizeof(std::uint8_t),  // PRINT_REGISTER (8-bit register index)
     sizeof(std::uint32_t), // PRINT_AT_ADDRESS (32-bit imm address)
@@ -28,7 +31,7 @@ const size_t PACKET_SIZE_TABLE[(int)layer::DebugCommand::COUNT] = {
 
 namespace layer {
 
-Debugee::Debugee() {
+Debugee::Debugee(ExecutionState &ps) {
   _socket = socket(AF_INET, SOCK_STREAM, 0);
 
   if (!_socket) {
@@ -54,8 +57,9 @@ Debugee::Debugee() {
         "ExecutionDebugee ctor: failed to listen on socket.");
   }
 
-  if (!(_connection = accept(_socket, (struct sockaddr *)&address,
-                             (socklen_t *)&address))) {
+  socklen_t address_len;
+  if (!(_connection =
+            accept(_socket, (struct sockaddr *)&address, &address_len))) {
     throw std::runtime_error(
         "ExecutionDebugee ctor: failed to accept the connection.");
   }
@@ -69,7 +73,7 @@ Debugee::Debugee() {
   std::cout << "Connection established." << std::endl;
 
   while (_flags & PAUSED)
-    process(1000); // wait for continue
+    process(ps, 1000); // wait for continue
 }
 
 Debugee::~Debugee() {
@@ -80,6 +84,54 @@ Debugee::~Debugee() {
   if (_connection) {
     close(_connection);
   }
+}
+
+void Debugee::step(ExecutionState &ps) {
+  if (_flags & STEP) {
+    _flags &= ~STEP; // clear flag
+    send_paused(ps);
+  }
+
+  while (_flags & PAUSED)
+    process(ps, 1000); // wait for continue
+}
+
+void Debugee::skip(ExecutionState &ps, const std::string &info) {
+  bool is_breakpoint = _breakpoints.count(ps.r[PC] - 8);
+
+  if (is_breakpoint || _flags & SKIP) {
+    _flags &= ~SKIP; // clear flag
+
+    if (is_breakpoint) {
+      send_fmt("Breakpoint: %s", info);
+    } else {
+      send_fmt("%s", info);
+    }
+
+    send_paused(ps);
+  }
+
+  while (_flags & PAUSED)
+    process(ps, 1000); // wait for continue
+}
+
+void Debugee::send_paused(ExecutionState &ps) {
+  _flags |= PAUSED; // pause
+
+  std::uint32_t length = 0; // sending length 0 is pause request
+  write(_connection, &length, sizeof(length));
+}
+
+void Debugee::send_raw() {
+  auto temp_buffer_ptr = _temp_buffer.data();
+
+  std::uint32_t length = std::strlen(reinterpret_cast<char *>(temp_buffer_ptr));
+  length = htonl(length);
+
+  std::memmove(temp_buffer_ptr + sizeof(length), temp_buffer_ptr, length);
+  std::memcpy(temp_buffer_ptr, &length, sizeof(length));
+
+  write(_connection, temp_buffer_ptr, length + sizeof(length));
 }
 
 bool Debugee::poll(int timeout) {
@@ -102,19 +154,19 @@ bool Debugee::poll(int timeout) {
   return (fd.revents & POLLIN);
 }
 
-void Debugee::process(int timeout) {
-  auto recv_buffer_ptr = _recv_buffer.data();
+void Debugee::process(ExecutionState &ps, int timeout) {
+  auto temp_buffer_ptr = _temp_buffer.data();
 
   while (poll(timeout)) {
     ssize_t bytes_read =
-        ::read(_connection, recv_buffer_ptr, sizeof(_recv_buffer));
+        ::read(_connection, temp_buffer_ptr, sizeof(_temp_buffer));
 
     if (!bytes_read) {
       throw std::runtime_error("Debugee::poll: connection is lost.");
     }
 
-    _accum_buffer.insert(_accum_buffer.end(), recv_buffer_ptr,
-                         recv_buffer_ptr + bytes_read);
+    _accum_buffer.insert(_accum_buffer.end(), temp_buffer_ptr,
+                         temp_buffer_ptr + bytes_read);
   }
 
   // try to read as much as we can
@@ -130,12 +182,12 @@ void Debugee::process(int timeout) {
     }
 
     // not enough data
-    const auto command_size = PACKET_SIZE_TABLE[(int)_command];
+    const auto command_size = COMMAND_SIZE_TABLE[(int)_command];
     if (_accum_buffer.size() < command_size) {
       return;
     }
 
-    process_command();
+    process_command(ps);
 
     _accum_buffer.erase(_accum_buffer.begin(),
                         _accum_buffer.begin() + command_size);
@@ -143,7 +195,7 @@ void Debugee::process(int timeout) {
   }
 }
 
-void Debugee::process_command() {
+void Debugee::process_command(ExecutionState &ps) {
   switch (_command) {
   case DebugCommand::BREAK: {
     std::uint32_t value;
@@ -151,27 +203,58 @@ void Debugee::process_command() {
 
     if (_breakpoints.count(value)) {
       _breakpoints.erase(value);
-      send_text("Breakpoint at 0x%X removed.", value);
+      send_fmt("Breakpoint at 0x%X removed.", value);
       break;
     }
 
     _breakpoints.emplace(value);
-    send_text("Breakpoint at 0x%X set.", value);
+    send_fmt("Breakpoint at 0x%X set.", value);
     break;
   }
 
-  case DebugCommand::CONTINUE_STEP_MODE: {
+  case DebugCommand::STEP: {
+    _flags |= STEP;
+    break;
+  }
+
+  case layer::DebugCommand::SKIP: {
+    _flags |= SKIP;
+    break;
+  }
+
+  case DebugCommand::PAUSE_MODE: {
     std::uint8_t value;
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 
+    if (value) {
+      _flags |= PAUSED;
+    } else {
+      _flags &= ~PAUSED;
+    }
     break;
   }
 
-  case DebugCommand::PAUSE_MODE:
-  case DebugCommand::PRINT_REGISTER:
-  case DebugCommand::PRINT_AT_ADDRESS:
+  case DebugCommand::PRINT_REGISTER: {
+    std::uint8_t value;
+    std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+
+    send_fmt("r%d=0x%X (%d)", value, ps.r[value], ps.r[value]);
+    break;
+  }
+
+  case DebugCommand::PRINT_AT_ADDRESS: {
+    std::uint32_t value;
+    std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+
+    const std::uint8_t *ptr =
+        reinterpret_cast<const std::uint8_t *>(ps.address_resolve(value));
+    send_fmt("0x%X=0x%X (%d)", value, *ptr, *ptr);
+    break;
+  }
+
   case DebugCommand::DUMP:
   case DebugCommand::RESTORE:
+    break;
 
   default:
     throw std::runtime_error("Debugee::process_command: invalid command type.");

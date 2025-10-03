@@ -1,9 +1,7 @@
 executable(
-  'charm-cli',
+  'charm-dbg',
 
   sources: files(
     'main.cpp',
   ),
-
-  dependencies: [libcharm_dep],
 )

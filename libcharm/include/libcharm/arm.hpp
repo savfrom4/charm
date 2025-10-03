@@ -176,6 +176,17 @@ public:
     } hw_data_trans;
 
     struct {
+      bool pre_indx; /* Add offset after (0) or before (1) transfer? */
+      bool add;      /* Substract (0) or add (1) offset from base? */
+      bool psr;
+      bool write_back; /* Write address into base? */
+      bool load;       /* Store (0) or Load (1)? */
+
+      Register rn;
+      uint16_t reg_list;
+    } blk_data_trans;
+
+    struct {
       bool byte;
       Register rn, rd, rm;
     } data_swap;
@@ -188,17 +199,6 @@ public:
     struct {
       Register rm;
     } branchex;
-
-    struct {
-      bool pre_indx; /* Add offset after (0) or before (1) transfer? */
-      bool add;      /* Substract (0) or add (1) offset from base? */
-      bool psr;
-      bool write_back; /* Write address into base? */
-      bool load;       /* Store (0) or Load (1)? */
-
-      Register rn;
-      uint16_t reg_list;
-    } blk_data_trans;
 
     arm::instr_t raw;
   };

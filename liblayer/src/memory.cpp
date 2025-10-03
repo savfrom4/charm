@@ -1,5 +1,5 @@
 #include "liblayer/debug.hpp"
-#include "liblayer/liblayer.hpp"
+#include "liblayer/execution_state.hpp"
 #include <cstring>
 #include <mutex>
 
@@ -67,7 +67,8 @@ void ExecutionState::memory_init() {
     memcpy(&memory[i], &blk, sizeof(blk));
   }
 
-  LAYER_DBE_LOG("memory initialized with ", 1);
+  LAYER_DBE_LOG(*this, "Note: initialized %d bytes of memory.",
+                LAYER_MEMORY_SIZE);
 }
 
 void *ExecutionState::memory_alloc(uint32_t size) {

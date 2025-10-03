@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -17,15 +18,15 @@
 // defines because debug context isn't always available (when LAYER_DEBUG is not
 // set, for example)
 #ifdef LAYER_DEBUG
-#define LAYER_DBE_STEP_INSTR() _dbe.step_instruction()
-#define LAYER_DBE_STEP_INTERN() _dbe.step_internal()
-#define LAYER_DBE_REQUEST_PAUSE() _dbe.send_pause_request()
-#define LAYER_DBE_LOG(fmt, ...) _dbe.send(fmt, __VA_ARGS__)
+#define LAYER_DBE_STEP(ps) (ps).dbe.step(ps)
+#define LAYER_DBE_SKIP(ps, info) (ps).dbe.skip(ps, info)
+#define LAYER_DBE_LOG(ps, fmt, ...) (ps).dbe.send_fmt(fmt, __VA_ARGS__)
+#define LAYER_DBE_SEND_PAUSED(ps) (ps).dbe.send_paused(ps)
 #else
-#define LAYER_DBE_STEP_INSTR()
-#define LAYER_DBE_STEP_INTERN()
-#define LAYER_DBE_REQUEST_PAUSE()
-#define LAYER_DBE_LOG(fmt, ...)
+#define LAYER_DBE_STEP(ps)
+#define LAYER_DBE_SKIP(ps, info)
+#define LAYER_DBE_LOG(ps, fmt, ...)
+#define LAYER_DBE_SEND_PAUSED(ps)
 #endif
 
 namespace layer {
@@ -35,9 +36,10 @@ class ExecutionState;
 // NOTE: see .cpp file for sizes
 enum class DebugCommand : std::uint8_t {
   NONE,
-  BREAK,      // set/remove breakpoint
-  STEP,       // step to next execution point (either instruction or internal)
-  PAUSE_MODE, // set pause mode (pause/continue)
+  BREAK,            // set/remove breakpoint
+  STEP,             // skip to next step (either instruction or internal)
+  SKIP,             // skip to next instruction
+  PAUSE_MODE,       // set pause mode (pause/continue)
   PRINT_REGISTER,   // dump register
   PRINT_AT_ADDRESS, // dump unsigned byte at addr n
   DUMP,             // dump execution state
@@ -48,19 +50,24 @@ enum class DebugCommand : std::uint8_t {
 // debugee is a tcp listener that's used by charm-dbg
 class Debugee {
 public:
-  Debugee();
+  Debugee(ExecutionState &ps);
   ~Debugee();
 
-  // this function is called on each instruction, allows to process breakpoints
-  // and pause execution if required
-  void process_instruction(ExecutionState &ps);
+  // these two functions are called either each instruction or inside
+  // instruction impl
+  // if STEP or SKIP set respectively, they shall set PAUSE flag.
+  void step(ExecutionState &ps);
+  void skip(ExecutionState &ps, const std::string &info);
 
-  // this function is called internally inside the instruction impl
-  // if INTERNAL flag is set, it allows to step inside the instruction internals
-  void process_internal(ExecutionState &ps);
+  template <typename... Args>
+  inline void send_fmt(const std::string &fmt, Args... args) {
+    std::memset(_temp_buffer.data(), 0, _temp_buffer.size());
+    std::snprintf(reinterpret_cast<char *>(_temp_buffer.data()),
+                  _temp_buffer.size(), fmt.c_str(), args...);
+    send_raw();
+  }
 
-  void send_text(const std::string &fmt, ...);
-  void send_pause_request();
+  void send_paused(ExecutionState &ps);
 
 private:
   int _socket = -1, _connection = -1;
@@ -71,18 +78,24 @@ private:
 
   enum {
     NONE = 0,
-    PAUSED = 1 << 0,   // when set, public process_* call will stall and wait
-                       // for continue cmd from debugger
-    INTERNAL = 1 << 1, // see process_internal()
-  } _flags = PAUSED;
+    PAUSED = 1 << 0, // when set, public process_* call will stall and wait
+                     // for continue cmd from debugger
+    STEP = 1 << 1,   // when set, will execute until
+    SKIP = 1 << 2,
+  };
+  std::uint32_t _flags = PAUSED;
 
-  std::array<std::uint8_t, 512> _recv_buffer; /* read buffer */
+  std::array<std::uint8_t, 1024>
+      _temp_buffer; /* temp buffer used for various opeartions, such as read,
+                      snpritnf, etc... */
   std::vector<std::uint8_t>
       _accum_buffer; /* fill with data, then read packet */
 
+  void send_raw();
+
   bool poll(int timeout);
-  void process(int timeout);
-  void process_command();
+  void process(ExecutionState &ps, int timeout);
+  void process_command(ExecutionState &ps);
 };
 
 } // namespace layer

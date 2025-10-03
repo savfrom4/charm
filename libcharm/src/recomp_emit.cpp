@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -82,7 +83,7 @@ void Recompiler::emit_meson_options(const std::string &output_dir) {
   }
 
   std::ofstream ofs{meson_options_path};
-  ofs << "option('debug', type: 'boolean', value: false, "
+  ofs << "option('debugging', type: 'boolean', value: false, "
          "description: "
          "'Enable debugging via charm-dbg')"
       << std::endl;
@@ -100,26 +101,29 @@ void Recompiler::emit_meson_project(const std::string &output_dir) {
   }
 
   std::ofstream ofs{meson_project_path};
-  ofs << "project('output')" << std::endl << std::endl;
+  ofs << "project('output', 'cpp')" << std::endl << std::endl;
   ofs << "subdir('liblayer')" << std::endl << std::endl;
 
-  ofs << "include_directories = [ 'liblayer/include', '.' ]" << std::endl;
   ofs << "sources = files('code.cpp', 'data.cpp')" << std::endl << std::endl;
 
-  ofs << "if get_option('LIBLAYER_DEBUG')" << std::endl;
+  ofs << "if get_option('debugging')" << std::endl;
   ofs << "\tadd_project_arguments('-DLAYER_DEBUG', language : 'cpp')"
       << std::endl;
-  ofs << "endif" << std::endl << std::endl;
+  ofs << "endif" << std::endl;
+
+  ofs << "add_project_arguments('-Wno-unused-label', language : 'cpp')"
+      << std::endl
+      << std::endl;
 
   ofs << "if get_option('library')" << std::endl;
   ofs << "\toutput_dep = library('output', include_directories: "
-         "include_directories, sources: "
-         "sources)"
+         "[ '.' ], sources: "
+         "sources, dependencies: [liblayer_dep])"
       << std::endl;
   ofs << "else" << std::endl;
   ofs << "\toutput_dep = executable('output', include_directories: "
-         "include_directories, sources: "
-         "sources)"
+         "[ '.' ], sources: "
+         "sources, dependencies: [liblayer_dep])"
       << std::endl;
   ofs << "endif" << std::endl;
 }
@@ -140,22 +144,24 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
 
   ofs << "class ProgramState : public layer::ExecutionState {" << std::endl;
   ofs << "public:" << std::endl;
-  ofs << "\tuint32_t address_map(uintptr_t addr) override;" << std::endl;
-  ofs << "\tuintptr_t address_resolve(uint32_t addr) override;" << std::endl;
+  ofs << "\tstd::uint32_t address_map(std::uintptr_t addr) override;"
+      << std::endl;
+  ofs << "\tstd::uintptr_t address_resolve(std::uint32_t addr) override;"
+      << std::endl;
   ofs << "};" << std::endl << std::endl;
 
-  ofs << "void eval(ProgramState& ps, uint32_t address);" << std::endl
+  ofs << "void eval(ProgramState& ps, std::uint32_t address);" << std::endl
       << std::endl;
 
   ofs << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl << std::endl;
 
   for (auto &functions : _funs_exports) {
-    ofs << "void internal_" << symbol_name_map(functions.second.name)
+    ofs << "void export_" << symbol_name_map(functions.second.name)
         << "(ProgramState& ps);" << std::endl;
   }
 
   ofs << std::endl
-      << MINIFY_COMMENT("/* DEPENDENCIES */") << std::endl
+      << MINIFY_COMMENT("/* EXTERNAL DEPENDENCIES */") << std::endl
       << std::endl;
 
   for (auto &functions : _funs_reloc) {
@@ -166,6 +172,8 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
     ofs << "void external_" << symbol_name_map(functions.second.name)
         << "(ProgramState& ps);" << std::endl;
   }
+
+  ofs << std::endl;
 }
 
 void Recompiler::emit_code_source(const std::string &output_dir) {
@@ -185,11 +193,16 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
   ofs << "#include <liblayer/liblayer.hpp>" << std::endl;
   ofs << "#include \"code.hpp\"" << std::endl;
   ofs << "#include \"data.hpp\"" << std::endl << std::endl;
-  ofs << "#define INN(ADDR) case ADDR: a##ADDR: ps.r[PC] = ADDR+8;"
+  ofs << "#define INSTR(ADDR) case ADDR: a##ADDR: ps.r[PC] = ADDR+8;"
       << std::endl;
   ofs << "#define EXPORT(name, address) __attribute__((weak)) void "
          "name (ProgramState& ps) {ps.r[LR] = INSTR_RETURN_LR; "
          "eval(ps, address);}"
+      << std::endl;
+  ofs << "#define STUB(name) __attribute__((weak)) void "
+         "name (ProgramState& ps) { LAYER_DBE_LOG(ps, \"%s\", \"Note: "
+         "unimplemented "
+         "stub: \" #name); }"
       << std::endl;
   ofs << "using namespace layer;" << std::endl;
 
@@ -200,7 +213,7 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
   emit_code_address_mappings(ofs);
   emit_code_stubs(ofs);
 
-  ofs << "void eval(ProgramState& ps, uint32_t address) {" << std::endl;
+  ofs << "void eval(ProgramState& ps, std::uint32_t address) {" << std::endl;
   ofs << "__start__:" << std::endl;
   ofs << "\tswitch(address) {" << std::endl;
 
@@ -209,7 +222,7 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
              "function when PC is set it.")
       << std::endl;
 
-  ofs << "\tINN(INSTR_RETURN_LR) {" << std::endl;
+  ofs << "\tINSTR(INSTR_RETURN_LR) {" << std::endl;
   ofs << "\t\treturn;" << std::endl;
   ofs << "\t}" << std::endl << std::endl;
 
@@ -223,7 +236,7 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
       continue;
     }
 
-    ofs << "\tINN(0x" << functions.second.address << ") {" << std::endl;
+    ofs << "\tINSTR(0x" << functions.second.address << ") {" << std::endl;
     ofs << "\t\texternal_" << symbol_name_map(functions.second.name) << "(ps);"
         << std::endl;
     ofs << "\t\taddress = ps.r[LR]; goto __start__;" << std::endl;
@@ -262,6 +275,7 @@ void Recompiler::emit_data_header(const std::string &output_dir) {
       << std::endl;
 
   ofs << "#pragma once" << std::endl;
+  ofs << "#include <array>" << std::endl;
   ofs << "#include <cstdint>" << std::endl << std::endl;
 
   for (auto &section : _elf.sections) {
@@ -272,27 +286,23 @@ void Recompiler::emit_data_header(const std::string &output_dir) {
     auto name = symbol_name_map(section->get_name());
     std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-    if (section->get_name().find(".got") == std::string::npos) {
-      ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-                  ? "extern uint8_t g_"
-                  : "extern const uint8_t g_");
+    auto data_type = "std::uint8_t";
+    auto data_size = section->get_size();
 
-      ofs << name << "_DATA[" << section->get_size() << "];" << std::endl;
-    } else {
-      ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-                  ? "extern uint32_t g_"
-                  : "extern const uint32_t g_");
-
-      ofs << name << "_DATA[" << (section->get_size() / sizeof(uint32_t))
-          << "];" << std::endl;
+    // for .got entries, we actually store words
+    if (section->get_name().find(".got") != std::string::npos) {
+      data_type = "std::uint32_t";
+      data_size /= sizeof(uint32_t);
     }
 
-    ofs << "#define " << name << "_ADDR (0x" << std::hex
-        << section->get_address() << std::dec << ") /* Virtual address of "
-        << section->get_name() << " */" << std::endl;
+    ofs << ((section->get_flags() & ELFIO::SHF_WRITE) ? "extern"
+                                                      : "extern const")
+        << " std::array<" << data_type << ", " << data_size << "> g_" << name
+        << "_DATA;" << std::endl;
 
-    ofs << "#define " << name << "_SIZE (" << section->get_size()
-        << ") /* Size of " << section->get_name() << " */ " << std::endl
+    ofs << "inline constexpr std::uint32_t " << name << "_ADDR = 0x" << std::hex
+        << section->get_address() << std::dec << "; /* Virtual address of "
+        << section->get_name() << " */" << std::endl
         << std::endl;
   }
 }
@@ -314,8 +324,8 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
       continue;
     }
 
-    const uint8_t *data =
-        reinterpret_cast<const uint8_t *>(section->get_data());
+    const std::uint8_t *data =
+        reinterpret_cast<const std::uint8_t *>(section->get_data());
 
     auto name = symbol_name_map(section->get_name());
     std::transform(name.begin(), name.end(), name.begin(), ::toupper);
@@ -324,10 +334,10 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
 
     // for non-got table we just write raw bytes or 0es
     if (section->get_name().find(".got") == std::string::npos) {
-      ofs << ((section->get_flags() & ELFIO::SHF_WRITE) ? "uint8_t g_"
-                                                        : "const uint8_t g_");
-
-      ofs << name << "_DATA[" << section->get_size() << "] = {" << std::endl;
+      ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
+                  ? "std::array<std::uint8_t, "
+                  : "const std::array<std::uint8_t, ")
+          << section->get_size() << "> g_" << name << "_DATA = {" << std::endl;
 
       ss << "\t";
       for (charm::arm::addr_t i = 0; i < section->get_size(); i++) {
@@ -339,11 +349,11 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
         }
       }
     } else { // for got we map addresses that we know
-      ofs << ((section->get_flags() & ELFIO::SHF_WRITE) ? "uint32_t g_"
-                                                        : "const uint32_t g_");
-
-      ofs << name << "_DATA[" << (section->get_size() / sizeof(arm::instr_t))
-          << "] = {" << std::endl;
+      ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
+                  ? "std::array<std::uint32_t, "
+                  : "const std::array<std::uint32_t, ")
+          << section->get_size() / sizeof(std::uint32_t) << "> g_" << name
+          << "_DATA = {" << std::endl;
 
       ss << std::hex;
 
@@ -373,12 +383,12 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
 }
 
 void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
-  ofs << "inline uint32_t ProgramState::address_map(uintptr_t addr) {"
+  ofs << "inline std::uint32_t ProgramState::address_map(std::uintptr_t addr) {"
       << std::endl;
 
   ofs << std::hex;
 
-  ofs << "\tuint32_t mapped;" << std::endl;
+  ofs << "\tstd::uint32_t mapped;" << std::endl;
   ofs << "\tif((mapped = ExecutionState::address_map(addr))) { return mapped; }"
       << std::endl
       << std::endl;
@@ -391,23 +401,34 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
     auto name = symbol_name_map(section->get_name());
     std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-    ofs << "\tif(addr >= reinterpret_cast<uintptr_t>(g_" << name << "_DATA)"
-        << " && addr < reinterpret_cast<uintptr_t>(g_" << name << "_DATA) + "
-        << name << "_SIZE) {" << std::endl;
+    ofs << "\tif(addr >= reinterpret_cast<std::uintptr_t>(g_" << name
+        << "_DATA.data())"
+        << " && addr < reinterpret_cast<std::uintptr_t>(g_" << name
+        << "_DATA.data()) + sizeof(g_" << name << "_DATA)) {" << std::endl;
     ofs << "\t\treturn 0x" << (uint32_t)section->get_address()
         << " + static_cast<uint32_t>("
-        << "addr - reinterpret_cast<uintptr_t>(g_" << name << "_DATA));"
+        << "addr - reinterpret_cast<uintptr_t>(g_" << name << "_DATA.data()));"
         << std::endl;
 
     ofs << "\t}" << std::endl;
   }
 
-  ofs << "}" << std::endl << std::endl;
-
-  ofs << "inline uintptr_t ProgramState::address_resolve(uint32_t addr) {"
+  ofs << std::endl;
+  ofs << "\tLAYER_DBE_LOG(*this, \"Error: unable to map address: 0x%X!\", "
+         "addr);"
+      << std::endl;
+  ofs << "\tLAYER_DBE_SEND_PAUSED(*this);" << std::endl;
+  ofs << "\tthrow std::runtime_error(\"address_map: unable to map "
+         "address!\");"
       << std::endl;
 
-  ofs << "\tuintptr_t mapped;" << std::endl;
+  ofs << "}" << std::endl << std::endl;
+
+  ofs << "inline std::uintptr_t ProgramState::address_resolve(std::uint32_t "
+         "addr) {"
+      << std::endl;
+
+  ofs << "\tstd::uintptr_t mapped;" << std::endl;
   ofs << "\tif((mapped = ExecutionState::address_resolve(addr))) { return "
          "mapped; }"
       << std::endl
@@ -423,33 +444,42 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
 
     ofs << "\tif(addr >= 0x" << section->get_address() << " && addr < 0x"
         << section->get_address() + section->get_size() << ") {" << std::endl;
-    ofs << "\t\treturn reinterpret_cast<uintptr_t>(&reinterpret_cast<const "
+    ofs << "\t\treturn "
+           "reinterpret_cast<std::uintptr_t>(&reinterpret_cast<const "
            "char*>(g_"
-        << name << "_DATA)[addr - 0x" << section->get_address() << "]);"
+        << name << "_DATA.data())[addr - 0x" << section->get_address() << "]);"
         << std::endl;
 
     ofs << "\t}" << std::endl;
   }
+
+  ofs << std::endl;
+  ofs << "\tLAYER_DBE_LOG(*this, \"Error: unable to resolve address: 0x%X!\", "
+         "addr);"
+      << std::endl;
+  ofs << "\tLAYER_DBE_SEND_PAUSED(*this);" << std::endl;
+  ofs << "\tthrow std::runtime_error(\"address_resolve: unable to resolve "
+         "address!\");"
+      << std::endl;
 
   ofs << std::dec;
   ofs << "}" << std::endl << std::endl;
 }
 
 void Recompiler::emit_code_stubs(std::ofstream &ofs) {
-
   ofs << std::endl
       << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl
       << std::endl;
 
   ofs << std::hex;
   for (auto &functions : _funs_exports) {
-    ofs << "EXPORT(internal_" << symbol_name_map(functions.second.name)
-        << ", 0x" << functions.second.address << ");" << std::endl;
+    ofs << "EXPORT(export_" << symbol_name_map(functions.second.name) << ", 0x"
+        << functions.second.address << ");" << std::endl;
   }
   ofs << std::dec;
 
   ofs << std::endl
-      << MINIFY_COMMENT("/* DEPENDENCY STUBS */") << std::endl
+      << MINIFY_COMMENT("/* EXTERNAL DEPENDENCIES */") << std::endl
       << std::endl;
 
   for (auto &functions : _funs_reloc) {
@@ -457,13 +487,11 @@ void Recompiler::emit_code_stubs(std::ofstream &ofs) {
       continue;
     }
 
-    ofs << "__attribute__((weak)) void external_"
-        << symbol_name_map(functions.second.name) << "(ProgramState& ps) {"
+    ofs << "STUB(external_" << symbol_name_map(functions.second.name) << ");"
         << std::endl;
-    ofs << "\tstd::cout << \"stub: " << symbol_name_map(functions.second.name)
-        << "\" << std::endl;" << std::endl;
-    ofs << "}" << std::endl << std::endl;
   }
+
+  ofs << std::endl;
 }
 
 void Recompiler::emit_code_section(std::ofstream &ofs,
@@ -491,7 +519,7 @@ void Recompiler::emit_code_section(std::ofstream &ofs,
   for (arm::addr_t i = 0; i < data_size; i += sizeof(arm::instr_t)) {
     arm::addr_t addr = static_cast<arm::addr_t>(section->get_address() + i);
 
-    ss << std::hex << "\tINN(0x" << addr << ") {" << std::dec << std::endl;
+    ss << std::hex << "\tINSTR(0x" << addr << ") {" << std::dec << std::endl;
 
     arm::instr_t instr_raw;
     memcpy(&instr_raw, data + i, sizeof(arm::instr_t));
@@ -501,7 +529,7 @@ void Recompiler::emit_code_section(std::ofstream &ofs,
 
     if (!_minify) {
       ss << "\t\t" << COND_TABLE[(int)instr.cond] << "(";
-      ss << "LAYER_LOG(\"0x" << std::hex << addr << ": ";
+      ss << "LAYER_DBE_SKIP(ps, \"0x" << std::hex << addr << ": ";
       instr.dump(ss);
       ss << "\"));" << std::endl;
     }
@@ -667,7 +695,8 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
     break;
 
   case arm::InstructionGroup::BRANCH: {
-    uint32_t final_offset = (int64_t)(address + 8) + instr.branch.offset;
+    std::uint32_t final_offset =
+        (std::int64_t)(address + 8) + instr.branch.offset;
 
     // maybe we are calling external fn
     bool found_section = false;
@@ -757,13 +786,13 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
            << MINIFY_COMMENT_COMMA(" /* rm */,")
 
            << "0x" << std::hex
-           << (uint32_t)instr.data_trans.offset_reg.amount_or_rs << std::dec
-           << MINIFY_COMMENT(" /* amount */") << ")";
+           << (std::uint32_t)instr.data_trans.offset_reg.amount_or_rs
+           << std::dec << MINIFY_COMMENT(" /* amount */") << ")";
       }
     }
 
     os << std::dec;
-    os << ", true" << MINIFY_COMMENT(" /* copy */") << ");";
+    os << ");";
 
     if (instr.data_trans.load) {
       if (instr.data_trans.rd != arm::Register::PC) {
@@ -793,8 +822,7 @@ void Recompiler::emit_code_arm(std::ostream &os, const arm::Instruction &instr,
        << MINIFY_COMMENT_COMMA(" /* rn */, ") << std::hex << "0x"
 
        << instr.blk_data_trans.reg_list << std::dec
-       << MINIFY_COMMENT_COMMA(" /* reg_list */, ") << "true"
-       << MINIFY_COMMENT(" /* copy */") << ");";
+       << MINIFY_COMMENT(" /* reg_list */") << ");";
 
     if (instr.blk_data_trans.load) {
       if (!((instr.blk_data_trans.reg_list >> (int)arm::Register::PC) & 1)) {

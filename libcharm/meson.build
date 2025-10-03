@@ -12,8 +12,6 @@ libcharm = library(
     'src/recomp_analysis.cpp',
     'src/recomp_emit.cpp',
   ),
-
-  dependencies: [liblayer_dep],
 )
 
 libcharm_dep = declare_dependency(
