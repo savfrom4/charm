@@ -262,10 +262,11 @@ void Debugee::process_command() {
   }
 
   case DebugCommand::PRINT_REGISTER: {
-    std::uint8_t value;
+    std::uint32_t value;
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+    value = ntohl(value);
 
-    send_format("r%d=0x%X (%d)", value, _ps.r[value], _ps.r[value]);
+    send_format("r%d=0x%X (%u)", value, _ps.r[value], _ps.r[value]);
     break;
   }
 
@@ -276,7 +277,7 @@ void Debugee::process_command() {
 
     const std::uint8_t *ptr =
         reinterpret_cast<const std::uint8_t *>(_ps.address_resolve(value));
-    send_format("0x%X=0x%X (%d)", value, *ptr, *ptr);
+    send_format("0x%X=0x%X (%u)", value, *ptr, *ptr);
     break;
   }
 

@@ -110,8 +110,9 @@ read_header:
     swap32  var_image_height
     stm     var_info_ptr!, { var_image_width, var_image_height } @ store info
 
-    ldrb    var_image_channels, [var_data_ptr], #1 @ read channels
-    str     var_image_channels, [var_info_ptr], #4 @ store info
+    ldrb    var_image_channels, [var_data_ptr], #1  @ read channels
+    str     var_image_channels, [var_info_ptr], #4  @ store info
+    add     var_data_ptr, var_data_ptr, #1          @ skip colorspace
 
     bx      lr
 
@@ -123,9 +124,8 @@ var_index_array_ptr .req    r4
     push    {var_data_ptr, var_data_end_ptr, lr}
 
     @ calculate size
-    mov     r1, #4                                  @ num of channels
     mul     r0, var_image_width, var_image_height   @ w * h
-    mul     r0, r1, r0  @ 4 * dim
+    mov     r0, r0, lsl #2                          @ 4 * dim
 
     @ alloc mem for read
     bl      malloc
@@ -140,12 +140,18 @@ var_index_array_ptr .req    r4
     mov     var_data_run, #0                                    @ current run (done here since r3 is free by now)
     mov     var_index_array_ptr, sp                             @ save index array ptr (done here since r4 is free by now)
 
+    @ setup colors
+    mov     var_color_r, #0
+    mov     var_color_g, #0
+    mov     var_color_b, #0
+    mov     var_color_a, #0xFF
+
     loop:
         cmp     var_data_run, #0    @ check if run is 0
         subne   var_data_run, #1    @ run --;
-        bne     loop_end
+        bne     loop_end_run
 
-        ldrb    r11, [r0], #1
+        ldrb    r11, [var_data_ptr], #1
 
         @ if QOI_OP_RGB
         cmp     r11, #QOI_OP_RGB
@@ -171,7 +177,7 @@ var_index_array_ptr .req    r4
 
         @ if QOI_OP_RUN
         cmp     r12, #QOI_OP_RUN
-        beq     index
+        beq     run
 
         @ QOI_OP_RGB
         rgb:
@@ -189,27 +195,28 @@ var_index_array_ptr .req    r4
 
         @ QOI_OP_INDEX
         index:
+            mov         r11, r11, lsl #2    @ index * 4
             add         r11, r11, var_index_array_ptr
             rgba_load   r11
             b           loop_end
 
         diff:
             @ calculate r
-            mov         r11, r11, lsr #4
-            and         r11, r11, #0x03
-            sub         r11, r11, #2
-            add         var_color_r, var_color_r, r11
+            mov         r12, r11, lsr #4
+            and         r12, r12, #0x03
+            sub         r12, r12, #2
+            add         var_color_r, var_color_r, r12
 
             @ calculate g
-            mov         r11, r11, lsr #2
-            and         r11, r11, #0x03
-            sub         r11, r11, #2
-            add         var_color_r, var_color_r, r11
+            mov         r12, r11, lsr #2
+            and         r12, r12, #0x03
+            sub         r12, r12, #2
+            add         var_color_g, var_color_g, r12
 
             @ calculate b
-            and         r11, r11, #0x03
-            sub         r11, r11, #2
-            add         var_color_r, var_color_r, r11
+            and         r12, r11, #0x03
+            sub         r12, r12, #2
+            add         var_color_b, var_color_b, r12
 
             b           loop_end
 
@@ -224,13 +231,16 @@ var_index_array_ptr .req    r4
             b           loop_end
 
         loop_end:
-            rgba_store  var_decoded_ptr
-
             @ store index
             rgba_hash
-            add         r11, var_index_array_ptr, r12  @ calculate hash ptr
-            rgba_store  r11
 
+            @ (4 * hash_index) + ptr
+            mov         r12, r12, lsl #2
+            add         r12, r12, var_index_array_ptr
+            rgba_store  r12
+
+        loop_end_run:
+            rgba_store  var_decoded_ptr
             cmp         var_data_ptr, var_data_end_ptr
             blo         loop
 

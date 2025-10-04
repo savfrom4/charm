@@ -55,10 +55,13 @@ Instruction Instruction::decode(instr_t instr) {
 
       if (!type) {
         info.decode_multiply(instr);
+        return info;
       } else if (type == 0b00001) {
         info.decode_multiply_long(instr);
+        return info;
       } else if (type == 0b00010 && !get_bits<8, 4>(instr)) {
         info.decode_single_data_swap(instr);
+        return info;
       }
 
       break;
@@ -312,25 +315,28 @@ inline void Instruction::decode_shift(instr_t instr, Shifter &shift) {
       static_cast<Register>(get_bits<0, 4>(instr)); /* Rm register, bits 0-3 */
 }
 
-void Instruction::dump(std::ostream &ofs) {
-  ofs << "(" << COND_TABLE[(int)condition] << ") ";
+void Instruction::dump(std::ostream &os) {
+  const auto prev_flags = os.flags();
+  os << std::dec;
+
+  os << "(" << COND_TABLE[(int)condition] << ") ";
 
   switch (group) {
   case InstructionGroup::DATA_PROCESSING: {
-    ofs << OPCODE_TABLE[(int)data.op] << " ";
-    ofs << REGISTER_TABLE[(int)data.rd] << ", " << REGISTER_TABLE[(int)data.rn]
-        << ", ";
+    os << OPCODE_TABLE[(int)data.op] << " ";
+    os << REGISTER_TABLE[(int)data.rd] << ", " << REGISTER_TABLE[(int)data.rn]
+       << ", ";
 
     if (immediate) {
-      ofs << "#" << (uint32_t)data.op2_imm;
+      os << "#" << (uint32_t)data.op2_imm;
     } else {
-      ofs << REGISTER_TABLE[(int)data.op2_reg.rm];
+      os << REGISTER_TABLE[(int)data.op2_reg.rm];
       if (data.op2_reg.amount_or_rs != 0) {
-        ofs << ", " << SHIFT_TABLE[(int)data.op2_reg.type] << " ";
+        os << ", " << SHIFT_TABLE[(int)data.op2_reg.type] << " ";
         if (data.op2_reg.is_reg) {
-          ofs << REGISTER_TABLE[data.op2_reg.amount_or_rs];
+          os << REGISTER_TABLE[data.op2_reg.amount_or_rs];
         } else {
-          ofs << "#" << (int)data.op2_reg.amount_or_rs;
+          os << "#" << (int)data.op2_reg.amount_or_rs;
         }
       }
     }
@@ -338,85 +344,85 @@ void Instruction::dump(std::ostream &ofs) {
   }
 
   case InstructionGroup::MULTIPLY: {
-    ofs << (mul.accumulate ? "mla " : "mul ");
-    ofs << REGISTER_TABLE[(int)mul.rd] << ", ";
-    ofs << REGISTER_TABLE[(int)mul.rm] << ", ";
-    ofs << REGISTER_TABLE[(int)mul.rs];
+    os << (mul.accumulate ? "mla " : "mul ");
+    os << REGISTER_TABLE[(int)mul.rd] << ", ";
+    os << REGISTER_TABLE[(int)mul.rm] << ", ";
+    os << REGISTER_TABLE[(int)mul.rs];
 
     if (mul.accumulate)
-      ofs << ", " << REGISTER_TABLE[(int)mul.rn];
+      os << ", " << REGISTER_TABLE[(int)mul.rn];
 
     break;
   }
 
   case InstructionGroup::MULTIPLY_LONG: {
-    ofs << (mul_long.sign ? (mul_long.accumulate ? "smlal " : "smull ")
-                          : (mul_long.accumulate ? "umlal " : "umull "));
-    ofs << REGISTER_TABLE[(int)mul_long.rd_lo] << ", ";
-    ofs << REGISTER_TABLE[(int)mul_long.rd_hi] << ", ";
-    ofs << REGISTER_TABLE[(int)mul_long.rm] << ", ";
-    ofs << REGISTER_TABLE[(int)mul_long.rs];
+    os << (mul_long.sign ? (mul_long.accumulate ? "smlal " : "smull ")
+                         : (mul_long.accumulate ? "umlal " : "umull "));
+    os << REGISTER_TABLE[(int)mul_long.rd_lo] << ", ";
+    os << REGISTER_TABLE[(int)mul_long.rd_hi] << ", ";
+    os << REGISTER_TABLE[(int)mul_long.rm] << ", ";
+    os << REGISTER_TABLE[(int)mul_long.rs];
     break;
   }
 
   case InstructionGroup::SINGLE_DATA_SWAP: {
-    ofs << (data_swap.byte ? "swpb " : "swp ");
-    ofs << REGISTER_TABLE[(int)data_swap.rd] << ", ";
-    ofs << REGISTER_TABLE[(int)data_swap.rm] << ", [";
-    ofs << REGISTER_TABLE[(int)data_swap.rn] << "]";
+    os << (data_swap.byte ? "swpb " : "swp ");
+    os << REGISTER_TABLE[(int)data_swap.rd] << ", ";
+    os << REGISTER_TABLE[(int)data_swap.rm] << ", [";
+    os << REGISTER_TABLE[(int)data_swap.rn] << "]";
     break;
   }
 
   case InstructionGroup::BRANCH: {
-    ofs << (branch.link ? "bl " : "b ");
-    ofs << "#" << branch.offset;
+    os << (branch.link ? "bl " : "b ");
+    os << "#" << branch.offset;
     break;
   }
 
   case InstructionGroup::BRANCH_EXCHANGE: {
-    ofs << "bx " << REGISTER_TABLE[(int)branchex.rm];
+    os << "bx " << REGISTER_TABLE[(int)branchex.rm];
     break;
   }
 
   case InstructionGroup::SINGLE_DATA_TRANSFER: {
     if (data_trans.write_back && data_trans.rn == Register::SP) {
-      ofs << (data_trans.load ? "pop" : "push");
+      os << (data_trans.load ? "pop" : "push");
     } else {
-      ofs << (data_trans.load ? "ldr" : "str");
+      os << (data_trans.load ? "ldr" : "str");
     }
 
     if (data_trans.byte) {
-      ofs << "b";
+      os << "b";
     }
 
-    ofs << " " << REGISTER_TABLE[(int)data_trans.rd] << ", [";
-    ofs << REGISTER_TABLE[(int)data_trans.rn];
+    os << " " << REGISTER_TABLE[(int)data_trans.rd] << ", [";
+    os << REGISTER_TABLE[(int)data_trans.rn];
 
     if (!data_trans.pre_indx) {
-      ofs << "]";
+      os << "]";
     }
 
     if (immediate) {
       if (data_trans.offset_imm != 0)
-        ofs << ", #" << (data_trans.add ? "" : "-")
-            << (uint32_t)data_trans.offset_imm;
+        os << ", #" << (data_trans.add ? "" : "-")
+           << (uint32_t)data_trans.offset_imm;
     } else {
-      ofs << ", " << REGISTER_TABLE[(int)data_trans.offset_reg.rm];
+      os << ", " << REGISTER_TABLE[(int)data_trans.offset_reg.rm];
       if (data_trans.offset_reg.amount_or_rs != 0) {
-        ofs << ", " << SHIFT_TABLE[(int)data_trans.offset_reg.type] << " ";
+        os << ", " << SHIFT_TABLE[(int)data_trans.offset_reg.type] << " ";
         if (data_trans.offset_reg.is_reg) {
-          ofs << REGISTER_TABLE[data_trans.offset_reg.amount_or_rs];
+          os << REGISTER_TABLE[data_trans.offset_reg.amount_or_rs];
         } else {
-          ofs << "#" << (int)data_trans.offset_reg.amount_or_rs;
+          os << "#" << (int)data_trans.offset_reg.amount_or_rs;
         }
       }
     }
 
     if (data_trans.pre_indx) {
-      ofs << "]";
+      os << "]";
 
       if (data_trans.write_back) {
-        ofs << "!";
+        os << "!";
       }
     }
 
@@ -425,30 +431,30 @@ void Instruction::dump(std::ostream &ofs) {
 
   case InstructionGroup::BLOCK_DATA_TRANSFER: {
     if (blk_data_trans.write_back && blk_data_trans.rn == Register::SP) {
-      ofs << (blk_data_trans.load ? "pop" : "push");
+      os << (blk_data_trans.load ? "pop" : "push");
     } else {
-      ofs << (blk_data_trans.load ? "ldm" : "stm");
-      ofs << " " << REGISTER_TABLE[(int)blk_data_trans.rn];
+      os << (blk_data_trans.load ? "ldm" : "stm");
+      os << " " << REGISTER_TABLE[(int)blk_data_trans.rn];
 
       if (blk_data_trans.pre_indx && blk_data_trans.write_back) {
-        ofs << "!";
+        os << "!";
       }
     }
 
-    ofs << ", {";
+    os << ", {";
 
     bool first = true;
     for (int i = 0; i < 16; ++i) {
       if (blk_data_trans.reg_list & (1 << i)) {
         if (!first)
-          ofs << ", ";
+          os << ", ";
 
-        ofs << REGISTER_TABLE[i];
+        os << REGISTER_TABLE[i];
         first = false;
       }
     }
 
-    ofs << "}";
+    os << "}";
 
     if (blk_data_trans.pre_indx) {
       break;
@@ -458,51 +464,53 @@ void Instruction::dump(std::ostream &ofs) {
   }
 
   case InstructionGroup::SWI: {
-    ofs << "swi";
+    os << "swi";
     break;
   }
 
   case InstructionGroup::INVALID: {
-    ofs << "invalid";
+    os << "invalid";
     break;
   }
 
   case InstructionGroup::HALFWORD_DATA_TRANSFER: {
-    ofs << (hw_data_trans.load ? "ldr" : "str");
+    os << (hw_data_trans.load ? "ldr" : "str");
 
     switch (hw_data_trans.type) {
     case HalfWordTransferType::UHW:
-      ofs << "h";
+      os << "h";
       break;
     case HalfWordTransferType::SWP:
-      ofs << "swp";
+      os << "swp";
       break;
     case HalfWordTransferType::SB:
-      ofs << "sb";
+      os << "sb";
       break;
     case HalfWordTransferType::SHW:
-      ofs << "shr";
+      os << "shr";
       break;
     }
 
-    ofs << " " << REGISTER_TABLE[(int)hw_data_trans.rd] << ", [";
-    ofs << REGISTER_TABLE[(int)hw_data_trans.rn];
+    os << " " << REGISTER_TABLE[(int)hw_data_trans.rd] << ", [";
+    os << REGISTER_TABLE[(int)hw_data_trans.rn];
 
     if (immediate) {
       if (hw_data_trans.offset_imm != 0)
-        ofs << ", #" << (uint32_t)hw_data_trans.offset_imm;
+        os << ", #" << (uint32_t)hw_data_trans.offset_imm;
     } else {
-      ofs << ", " << REGISTER_TABLE[(int)hw_data_trans.offset_reg];
+      os << ", " << REGISTER_TABLE[(int)hw_data_trans.offset_reg];
     }
 
-    ofs << "]";
+    os << "]";
 
     if (data_trans.write_back)
-      ofs << "!";
+      os << "!";
 
     break;
   }
   }
+
+  os.setf(prev_flags);
 }
 
 } // namespace charm::arm

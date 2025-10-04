@@ -154,8 +154,8 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
       << std::endl;
   ofs << "#define JUMP(ADDR) address = ADDR;  goto __start__;" << std::endl;
   ofs << "#define EXPORT(name, address) __attribute__((weak)) void "
-         "name (ProgramState& ps) { LAYER_DBE_SKIP(ps, \"%s\", \"external "
-         "call: \" #name); "
+         "name (ProgramState& ps) { LAYER_DBE_SKIP(ps, \"%s\", \"call: \" "
+         "#name); "
          "ps.r[LR] = INSTR_RETURN_LR; "
          "eval(ps, address); }"
       << std::endl;

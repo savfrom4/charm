@@ -185,7 +185,8 @@ void debugger_execute_command(int connection, const std::string &full_command,
   case hasher("b"):
   case hasher("break"): {
     buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::BREAK);
-    buffer_write(temp_buffer, buffer_offset, std::stoul(arg, 0, 0));
+    buffer_write<std::uint32_t>(temp_buffer, buffer_offset,
+                                std::stoul(arg, 0, 0));
     break;
   }
 
@@ -283,7 +284,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
   case hasher("c"):
   case hasher("continue"): {
     buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::PAUSE_MODE);
-    buffer_write(temp_buffer, buffer_offset, (std::uint8_t)false);
+    buffer_write<std::uint8_t>(temp_buffer, buffer_offset, false);
     paused = false;
     break;
   }
