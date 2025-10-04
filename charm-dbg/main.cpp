@@ -178,6 +178,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
     std::cout << "continue(c)" << std::endl;
     std::cout << "next(n)" << std::endl;
     std::cout << "skip(s)" << std::endl;
+    std::cout << "restart(r)" << std::endl;
     std::cout << "exit/quit(e/q)" << std::endl;
     break;
   }

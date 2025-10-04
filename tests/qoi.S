@@ -55,20 +55,20 @@ var_color_a         .req    r9
 
 @ direct port of QOI_COLOR_HASH macro with index wrapping built-in
 @ result is stored in r11
-.macro rgba_hash
-    mov     r10, #3
-    mul     r10, var_color_r, r10       @ C.rgba.r*3
+.macro rgba_hash reg
+    mov     r11, #3
+    mul     \reg, var_color_r, r11          @ C.rgba.r*3
 
     mov     r11, #5
-    mla     r10, var_color_g, r11, r10  @ C.rgba.r*3 + C.rgba.g*5
+    mla     \reg, var_color_g, r11, \reg    @ C.rgba.r*3 + C.rgba.g*5
 
     mov     r11, #7
-    mla     r10, var_color_b, r11, r10  @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
+    mla     \reg, var_color_b, r11, \reg    @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
 
     mov     r11, #11
-    mla     r10, var_color_a, r11, r10  @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
+    mla     \reg, var_color_a, r11, \reg    @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
 
-    and     r10, r10, #63   @ & (64 - 1)
+    and     \reg, \reg, #0x3F   @ & (64 - 1)
 .endm
 
 .macro rgba_load reg
@@ -128,6 +128,7 @@ read_header:
 
     bx      lr
 
+
 decode:
 var_data_end_ptr    .req    r1
 var_decoded_ptr     .req    r2
@@ -161,7 +162,7 @@ var_index_array_ptr .req    r4
     loop:
         cmp     var_data_run, #0    @ check if run is 0
         subne   var_data_run, #1    @ run --;
-        bne     loop_end_dont_store
+        bne     loop_end_no_index
 
         ldrb    r10, [var_data_ptr], #1
 
@@ -191,12 +192,15 @@ var_index_array_ptr .req    r4
         cmp     r11, #QOI_OP_RUN
         beq     run
 
+        @ no matches
+        b       loop_end
+
         @ QOI_OP_RGB
         rgb:
-            ldrb        var_color_r, [var_data_ptr], #1  @ r
-            ldrb        var_color_g, [var_data_ptr], #1  @ g
-            ldrb        var_color_b, [var_data_ptr], #1  @ b
-            mov         var_color_a, #0xFF  @ a
+            ldrb        var_color_r, [var_data_ptr], #1     @ r
+            ldrb        var_color_g, [var_data_ptr], #1     @ g
+            ldrb        var_color_b, [var_data_ptr], #1     @ b
+            mov         var_color_a, #0xFF                  @ a
 
             b           loop_end
 
@@ -210,8 +214,9 @@ var_index_array_ptr .req    r4
             mov         r10, r10, lsl #2    @ index * 4
             add         r10, r10, var_index_array_ptr
             rgba_load   r10
-            b           loop_end_dont_store
+            b           loop_end_no_index
 
+        @ QOI_OP_DIFF
         diff:
             @ calculate r
             mov         r11, r10, lsr #4
@@ -259,18 +264,18 @@ var_index_array_ptr .req    r4
         @ QOI_OP_RUN
         run:
             and         var_data_run, r10, #0x3F
-            b           loop_end
+            b           loop_end_no_index
 
         loop_end:
             @ store index
-            rgba_hash
+            rgba_hash   r10
 
             @ (4 * hash_index) + ptr
             mov         r10, r10, lsl #2
             add         r10, r10, var_index_array_ptr
             rgba_store  r10
 
-        loop_end_dont_store:
+        loop_end_no_index:
             rgba_store  var_decoded_ptr
             cmp         var_data_ptr, var_data_end_ptr
             blo         loop

@@ -25,7 +25,7 @@
 
 #ifndef LAYER_MEMORY_SIZE
 #define LAYER_MEMORY_SIZE                                                      \
-  (1024 * 1024 * 16) // Size of the memory (16 MiB, must be world-aligned)
+  (1024 * 1024 * 64) // Size of the memory (16 MiB, must be world-aligned)
 #endif
 
 #ifndef LAYER_MEMORY_BLOCK_SIZE

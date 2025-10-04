@@ -1,7 +1,6 @@
 #include "liblayer/debug.hpp"
 #include "liblayer/execution_state.hpp"
 #include <arpa/inet.h>
-#include <asm-generic/socket.h>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -83,12 +82,12 @@ Debugee::Debugee(ExecutionState &_ps) : _ps(_ps) {
 
   std::cout << "> Connection established!" << std::endl;
 
+  send_format("Waiting for user input...");
   stall();
-  send_format("> Executing...");
 }
 
 Debugee::~Debugee() {
-  send_format("> Reached program's end. Continuing will close the connection.");
+  send_format("Reached program's end. Continuing will close the connection.");
   send_paused();
   stall();
 
