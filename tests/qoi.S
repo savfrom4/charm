@@ -150,14 +150,14 @@ var_index_array_ptr .req    r4
     sub     sp, sp, #256                                        @ alloc index array on stack (64*4)
     add     var_data_end_ptr, var_data_ptr, var_data_len        @ calculate end ptr
     sub     var_data_end_ptr, var_data_end_ptr, #QOI_PADDING    @ - padding
-    mov     var_data_run, #0                                    @ current run (done here since r3 is free by now)
-    mov     var_index_array_ptr, sp                             @ save index array ptr (done here since r4 is free by now)
 
     @ setup colors
     mov     var_color_r, #0
     mov     var_color_g, #0
     mov     var_color_b, #0
     mov     var_color_a, #0xFF
+    mov     var_data_run, #0                                    @ current run (done here since r3 is free by now)
+    mov     var_index_array_ptr, sp                             @ save index array ptr (done here since r4 is free by now)
 
     loop:
         cmp     var_data_run, #0    @ check if run is 0
@@ -201,7 +201,6 @@ var_index_array_ptr .req    r4
             ldrb        var_color_g, [var_data_ptr], #1     @ g
             ldrb        var_color_b, [var_data_ptr], #1     @ b
             mov         var_color_a, #0xFF                  @ a
-
             b           loop_end
 
         @ QOI_OP_RGBA
@@ -274,7 +273,6 @@ var_index_array_ptr .req    r4
             mov         r10, r10, lsl #2
             add         r10, r10, var_index_array_ptr
             rgba_store  r10
-
         loop_end_no_index:
             rgba_store  var_decoded_ptr
             cmp         var_data_ptr, var_data_end_ptr

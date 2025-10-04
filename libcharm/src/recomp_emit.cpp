@@ -68,7 +68,9 @@ void Recompiler::emit_meson_project(const std::string &output_dir) {
   }
 
   std::ofstream ofs{meson_project_path};
-  ofs << "project('output', 'cpp')" << std::endl << std::endl;
+  ofs << "project('output', 'cpp', default_options: [ 'b_lto=true' ])"
+      << std::endl
+      << std::endl;
   ofs << "subdir('liblayer')" << std::endl << std::endl;
 
   ofs << "sources = files('code.cpp', 'data.cpp')" << std::endl << std::endl;

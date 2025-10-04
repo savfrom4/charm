@@ -627,6 +627,7 @@ void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
 
     memcpy(&r[i], mem, sizeof(uint32_t));
     r[i] = BESWAP32(r[i]);
+
     LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
                      "value read from %p: 0x%X", mem, r[i]);
 
@@ -649,7 +650,7 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
   if (add) {
     addr = pre_indx ? base + 4 : base;
   } else {
-    addr = pre_indx ? base - n * 4 : base - 4;
+    addr = pre_indx ? base - (n * 4) : base - 4;
   }
 
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
@@ -673,12 +674,13 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
     }
 
     LAYER_DBE_NEXT(*this, "%s: before write", __func__);
-
-    memcpy(mem, &r[i], sizeof(uint32_t));
     LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
                      "value wrote to %p: 0x%X", mem, r[i]);
-    LAYER_DBE_NEXT(*this, "%s: after write", __func__);
+
+    memcpy(mem, &r[i], sizeof(uint32_t));
     mem += 4;
+
+    LAYER_DBE_NEXT(*this, "%s: after write", __func__);
 
     if (!write_back || written) {
       continue;
@@ -686,9 +688,10 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
 
     // We write-back now
     r[rn] = add ? base + n * 4 : base - n * 4;
+    written = true;
+
     LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
                      "wrote back to r%d: 0x%X", rn, r[rn]);
-    written = true;
   }
 
   LAYER_DBE_NEXT(*this, "%s: after", __func__);
