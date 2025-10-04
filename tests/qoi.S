@@ -33,6 +33,7 @@ var_color_a         .req    r9
 .equ QOI_OP_RUN,        0xc0
 .equ QOI_PADDING,       0x08
 
+@ hacky way to byte swap
 .macro swap32 reg
     push    { r0, lr }
     mov     r0, \reg
@@ -42,21 +43,21 @@ var_color_a         .req    r9
 .endm
 
 @ direct port of QOI_COLOR_HASH macro with index wrapping built-in
-@ also we sin by using r12 as return value... not that we are following callconv anyways...
+@ result is stored in r11
 .macro rgba_hash
-    mov     r11, #3
-    mul     r12, r11, var_color_r   @ C.rgba.r*3
+    mov     r10, #3
+    mul     r11, r10, var_color_r   @ C.rgba.r*3
 
-    mov     r11, #5
-    mla     r12, var_color_g, r11, r12 @ C.rgba.r*3 + C.rgba.g*5
+    mov     r10, #5
+    mla     r11, var_color_g, r10, r11 @ C.rgba.r*3 + C.rgba.g*5
 
-    mov     r11, #7
-    mla     r12, var_color_b, r11, r12 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
+    mov     r10, #7
+    mla     r11, var_color_b, r10, r11 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
 
-    mov     r11, #11
-    mla     r12, var_color_a, r11, r12 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
+    mov     r10, #11
+    mla     r11, var_color_a, r10, r11 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
 
-    and     r12, r12, #63   @ & (64 - 1)
+    and     r11, r11, #63   @ & (64 - 1)
 .endm
 
 .macro rgba_load reg
@@ -151,32 +152,32 @@ var_index_array_ptr .req    r4
         subne   var_data_run, #1    @ run --;
         bne     loop_end_run
 
-        ldrb    r11, [var_data_ptr], #1
+        ldrb    r10, [var_data_ptr], #1
 
         @ if QOI_OP_RGB
-        cmp     r11, #QOI_OP_RGB
+        cmp     r10, #QOI_OP_RGB
         beq     rgb
 
         @ if QOI_OP_RGBA
-        cmp     r11, #QOI_OP_RGBA
+        cmp     r10, #QOI_OP_RGBA
         beq     rgba
 
-        and     r12, r11, #QOI_MASK2
+        and     r11, r10, #QOI_MASK2
 
         @ if QOI_OP_INDEX
-        cmp     r12, #QOI_OP_INDEX
+        cmp     r11, #QOI_OP_INDEX
         beq     index
 
         @ if QOI_OP_DIFF
-        cmp     r12, #QOI_OP_DIFF
+        cmp     r11, #QOI_OP_DIFF
         beq     diff
 
         @ if QOI_OP_LUMA
-        cmp     r12, #QOI_OP_LUMA
+        cmp     r11, #QOI_OP_LUMA
         beq     luma
 
         @ if QOI_OP_RUN
-        cmp     r12, #QOI_OP_RUN
+        cmp     r11, #QOI_OP_RUN
         beq     run
 
         @ QOI_OP_RGB
@@ -195,39 +196,58 @@ var_index_array_ptr .req    r4
 
         @ QOI_OP_INDEX
         index:
-            mov         r11, r11, lsl #2    @ index * 4
-            add         r11, r11, var_index_array_ptr
-            rgba_load   r11
+            mov         r10, r10, lsl #2    @ index * 4
+            add         r10, r10, var_index_array_ptr
+            rgba_load   r10
             b           loop_end
 
         diff:
             @ calculate r
-            mov         r12, r11, lsr #4
-            and         r12, r12, #0x03
-            sub         r12, r12, #2
-            add         var_color_r, var_color_r, r12
+            mov         r11, r10, lsr #4
+            and         r11, r11, #0x03
+            sub         r11, r11, #2
+            add         var_color_r, var_color_r, r11
 
             @ calculate g
-            mov         r12, r11, lsr #2
-            and         r12, r12, #0x03
-            sub         r12, r12, #2
-            add         var_color_g, var_color_g, r12
+            mov         r11, r10, lsr #2
+            and         r11, r11, #0x03
+            sub         r11, r11, #2
+            add         var_color_g, var_color_g, r11
 
             @ calculate b
-            and         r12, r11, #0x03
-            sub         r12, r12, #2
-            add         var_color_b, var_color_b, r12
+            and         r11, r10, #0x03
+            sub         r11, r11, #2
+            add         var_color_b, var_color_b, r11
 
             b           loop_end
 
         luma:
-            @ stub
-            ldrb        r11, [var_data_ptr], #1  @ just read for now
+            @ calculate r offset
+            and         r10, r10, #0x3F
+            sub         r10, r10, #32
+            add         var_color_g, var_color_g, r10   @ g += vg
+
+            @ in next calculations we only use vg - 8
+            sub         r10, r10, #8
+
+            @ load "b2"
+            ldrb        r11, [var_data_ptr], #1
+            mov         r12, r11, lsr #4
+
+            @ calulate both right away
+            and         r11, r11, #0x0F
+            and         r12, r12, #0x0F
+            add         r11, r11, r10
+            add         r12, r12, r10
+
+            add         var_color_b, var_color_b, r11   @ b += vg - 8 +  (b2       & 0x0f)
+            add         var_color_r, var_color_r, r12   @ r += vg - 8 + ((b2 >> 4) & 0x0f);
+
             b           loop_end
 
         @ QOI_OP_RUN
         run:
-            and         var_data_run, r11, #0x3F
+            and         var_data_run, r10, #0x3F
             b           loop_end
 
         loop_end:
@@ -235,9 +255,9 @@ var_index_array_ptr .req    r4
             rgba_hash
 
             @ (4 * hash_index) + ptr
-            mov         r12, r12, lsl #2
-            add         r12, r12, var_index_array_ptr
-            rgba_store  r12
+            mov         r10, r10, lsl #2
+            add         r10, r10, var_index_array_ptr
+            rgba_store  r10
 
         loop_end_run:
             rgba_store  var_decoded_ptr
