@@ -4,7 +4,6 @@
 
 .section .text
 .extern     malloc
-.extern     __bswap_32
 .global     qoi_decode
 .type       qoi_decode,     %function
 
@@ -35,29 +34,41 @@ var_color_a         .req    r9
 
 @ hacky way to byte swap
 .macro swap32 reg
-    push    { r0, lr }
-    mov     r0, \reg
-    bl      __bswap_32
-    mov     \reg, r0
-    pop     { r0, lr }
+    mov     r10, #0
+
+    and     r11, \reg, #0xFF000000
+    mov     r11, r11, lsr #24
+    orr     r10, r10, r11
+
+    and     r11, \reg, #0x00FF0000
+    mov     r11, r11, lsr #8
+    orr     r10, r10, r11
+
+    and     r11, \reg, #0x0000FF00
+    mov     r11, r11, lsl #8
+    orr     r10, r10, r11
+
+    and     r11, \reg, #0x000000FF
+    mov     r11, r11, lsl #24
+    orr     \reg, r10, r11
 .endm
 
 @ direct port of QOI_COLOR_HASH macro with index wrapping built-in
 @ result is stored in r11
 .macro rgba_hash
     mov     r10, #3
-    mul     r11, r10, var_color_r   @ C.rgba.r*3
+    mul     r10, var_color_r, r10       @ C.rgba.r*3
 
-    mov     r10, #5
-    mla     r11, var_color_g, r10, r11 @ C.rgba.r*3 + C.rgba.g*5
+    mov     r11, #5
+    mla     r10, var_color_g, r11, r10  @ C.rgba.r*3 + C.rgba.g*5
 
-    mov     r10, #7
-    mla     r11, var_color_b, r10, r11 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
+    mov     r11, #7
+    mla     r10, var_color_b, r11, r10  @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7
 
-    mov     r10, #11
-    mla     r11, var_color_a, r10, r11 @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
+    mov     r11, #11
+    mla     r10, var_color_a, r11, r10  @ C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11
 
-    and     r11, r11, #63   @ & (64 - 1)
+    and     r10, r10, #63   @ & (64 - 1)
 .endm
 
 .macro rgba_load reg
@@ -150,7 +161,7 @@ var_index_array_ptr .req    r4
     loop:
         cmp     var_data_run, #0    @ check if run is 0
         subne   var_data_run, #1    @ run --;
-        bne     loop_end_run
+        bne     loop_end_dont_store
 
         ldrb    r10, [var_data_ptr], #1
 
@@ -199,7 +210,7 @@ var_index_array_ptr .req    r4
             mov         r10, r10, lsl #2    @ index * 4
             add         r10, r10, var_index_array_ptr
             rgba_load   r10
-            b           loop_end
+            b           loop_end_dont_store
 
         diff:
             @ calculate r
@@ -259,7 +270,7 @@ var_index_array_ptr .req    r4
             add         r10, r10, var_index_array_ptr
             rgba_store  r10
 
-        loop_end_run:
+        loop_end_dont_store:
             rgba_store  var_decoded_ptr
             cmp         var_data_ptr, var_data_end_ptr
             blo         loop
