@@ -45,16 +45,6 @@ Debugee::Debugee(ExecutionState &_ps) : _ps(_ps) {
       .sin_zero = {0},
   };
 
-  int one = 1;
-  if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0) {
-    throw std::runtime_error("ExecutionDebugee ctor: failed to set REUSEADDR.");
-  }
-
-  if (setsockopt(_socket, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one)) < 0) {
-    throw std::runtime_error(
-        "ExecutionDebugee ctor: failed to set SO_REUSEPORT.");
-  }
-
   if (bind(_socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to bind socket.");
   }
@@ -75,6 +65,7 @@ Debugee::Debugee(ExecutionState &_ps) : _ps(_ps) {
   }
 
   // disable nagle's algorithm
+  int one = 1;
   if (setsockopt(_connection, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) <
       0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to set NODELAY.");
@@ -137,6 +128,8 @@ void Debugee::send_paused() {
 
   std::uint32_t length = 0; // sending length 0 is pause request
   write(_connection, &length, sizeof(length));
+
+  stall();
 }
 
 void Debugee::send_message() {
@@ -274,8 +267,7 @@ void Debugee::process_command() {
     std::memcpy(&value, _accum_buffer.data(), sizeof(value));
     value = ntohl(value);
 
-    const std::uint8_t *ptr =
-        reinterpret_cast<const std::uint8_t *>(_ps.address_resolve(value));
+    const std::uint8_t *ptr = _ps.address_resolve<const std::uint8_t *>(value);
     send_format("0x%X=0x%X (%u)", value, *ptr, *ptr);
     break;
   }

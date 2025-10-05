@@ -1,5 +1,5 @@
-#include "libcharm/arm.hpp"
-#include "libcharm/recomp.hpp"
+#include "arm.hpp"
+#include "recomp.hpp"
 #include <ostream>
 #include <sstream>
 #include <tuple>

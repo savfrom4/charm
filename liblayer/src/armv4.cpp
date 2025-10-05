@@ -354,7 +354,7 @@ void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
                    addr);
 
-  const void *mem = reinterpret_cast<const void *>(address_resolve(addr));
+  const void *mem = reinterpret_cast<const void *>(address_resolve_raw(addr));
 
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -410,7 +410,7 @@ void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
                    addr);
 
-  void *mem = reinterpret_cast<void *>(address_resolve(addr));
+  void *mem = reinterpret_cast<void *>(address_resolve_raw(addr));
 
   if (UNLIKELY(!mem)) {
     LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
@@ -459,7 +459,7 @@ void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
                    addr);
 
-  const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
+  const char *mem = reinterpret_cast<const char *>(address_resolve_raw(addr));
 
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -532,7 +532,7 @@ void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
                    addr);
 
-  char *mem = reinterpret_cast<char *>(address_resolve(addr));
+  char *mem = reinterpret_cast<char *>(address_resolve_raw(addr));
 
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -606,7 +606,7 @@ void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
                    addr);
 
-  const char *mem = reinterpret_cast<const char *>(address_resolve(addr));
+  const char *mem = reinterpret_cast<const char *>(address_resolve_raw(addr));
 
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -656,7 +656,7 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
                    addr);
 
-  char *mem = reinterpret_cast<char *>(address_resolve(addr));
+  char *mem = reinterpret_cast<char *>(address_resolve_raw(addr));
   bool written = false;
 
   LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);

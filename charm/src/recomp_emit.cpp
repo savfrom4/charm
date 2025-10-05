@@ -1,5 +1,5 @@
-#include "libcharm/arm.hpp"
-#include "libcharm/recomp.hpp"
+#include "arm.hpp"
+#include "recomp.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -41,7 +41,7 @@ void Recompiler::step_emit(const std::string &output_dir) {
   emit_data_source(output_dir);
 }
 
-void Recompiler::emit_meson_options(const std::string &output_dir) {
+void Recompiler::ac(const std::string &output_dir) {
   auto meson_options_path = std::filesystem::path{
       std::filesystem::path{output_dir} / "meson_options.txt"};
 
@@ -108,9 +108,9 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
 
   ofs << "class ProgramState : public layer::ExecutionState {" << std::endl;
   ofs << "public:" << std::endl;
-  ofs << "\tstd::uint32_t address_map(std::uintptr_t addr) override;"
+  ofs << "\tstd::uint32_t address_map_raw(std::uintptr_t addr) override;"
       << std::endl;
-  ofs << "\tstd::uintptr_t address_resolve(std::uint32_t addr) override;"
+  ofs << "\tstd::uintptr_t address_resolve_raw(std::uint32_t addr) override;"
       << std::endl;
   ofs << "};" << std::endl << std::endl;
 
@@ -344,13 +344,15 @@ void Recompiler::emit_data_source(const std::string &output_dir) {
 }
 
 void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
-  ofs << "inline std::uint32_t ProgramState::address_map(std::uintptr_t addr) {"
+  ofs << "inline std::uint32_t ProgramState::address_map_raw(std::uintptr_t "
+         "addr) {"
       << std::endl;
 
   ofs << std::hex;
 
   ofs << "\tstd::uint32_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::address_map(addr))) { return mapped; }"
+  ofs << "\tif((mapped = ExecutionState::address_map_raw(addr))) { return "
+         "mapped; }"
       << std::endl
       << std::endl;
 
@@ -386,12 +388,13 @@ void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
 
   ofs << "}" << std::endl << std::endl;
 
-  ofs << "inline std::uintptr_t ProgramState::address_resolve(std::uint32_t "
+  ofs << "inline std::uintptr_t "
+         "ProgramState::address_resolve_raw(std::uint32_t "
          "addr) {"
       << std::endl;
 
   ofs << "\tstd::uintptr_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::address_resolve(addr))) { return "
+  ofs << "\tif((mapped = ExecutionState::address_resolve_raw(addr))) { return "
          "mapped; }"
       << std::endl
       << std::endl;

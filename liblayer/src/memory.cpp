@@ -1,6 +1,7 @@
 #include "liblayer/debug.hpp"
 #include "liblayer/execution_state.hpp"
 #include <cstring>
+#include <iostream>
 #include <mutex>
 
 #define BLOCK_ITER (LAYER_MEMORY_BLOCK_SIZE + sizeof(Block)) // + sizeof(Block)
@@ -12,7 +13,7 @@ struct Block {
 
 namespace layer {
 
-std::uint32_t ExecutionState::address_map(std::uintptr_t address) {
+std::uint32_t ExecutionState::address_map_raw(std::uintptr_t address) {
   auto stack_ptr = stack.data();
   auto memory_ptr = memory.data();
 
@@ -37,7 +38,7 @@ std::uint32_t ExecutionState::address_map(std::uintptr_t address) {
   return 0;
 }
 
-std::uintptr_t ExecutionState::address_resolve(std::uint32_t address) {
+std::uintptr_t ExecutionState::address_resolve_raw(std::uint32_t address) {
   // stack
   if (address >= LAYER_STACK_BASE &&
       address < LAYER_STACK_BASE + LAYER_STACK_SIZE) {
@@ -55,6 +56,11 @@ std::uintptr_t ExecutionState::address_resolve(std::uint32_t address) {
 }
 
 void ExecutionState::memory_init() {
+#if LAYER_STACK_SIZE > LAYER_STACK_ON_STACK_LIMIT
+  stack.resize(LAYER_STACK_SIZE);
+  std::memset(stack.data(), 0, LAYER_STACK_SIZE);
+#endif
+
   memory.resize(LAYER_MEMORY_SIZE);
   std::memset(memory.data(), 0, LAYER_MEMORY_SIZE);
 
@@ -79,12 +85,14 @@ void ExecutionState::memory_init() {
                 LAYER_MEMORY_BASE, LAYER_MEMORY_BASE + LAYER_MEMORY_SIZE);
 }
 
-void *ExecutionState::memory_alloc(uint32_t size) {
+void *ExecutionState::memory_alloc_raw(uint32_t size) {
   if (!size) {
     return nullptr;
   }
 
   size = (size + 3) & ~3; // word-align
+
+  std::cout << size << std::endl;
 
   std::lock_guard lock{_memory_lock};
 
@@ -120,6 +128,8 @@ void *ExecutionState::memory_alloc(uint32_t size) {
 
       blk.allocated = true;
       std::memcpy(ptr, &blk, sizeof(blk));
+      std::cout << reinterpret_cast<std::uintptr_t>(ptr + sizeof(blk))
+                << std::endl;
       return ptr + sizeof(blk);
     }
 
@@ -153,12 +163,15 @@ void *ExecutionState::memory_alloc(uint32_t size) {
       blk.allocated = true;
 
       std::memcpy(ptr, &blk, sizeof(blk));
+      std::cout << reinterpret_cast<std::uintptr_t>(ptr + sizeof(blk))
+                << std::endl;
       return ptr + sizeof(blk);
     }
 
     ptr += blk.size + sizeof(blk);
   }
 
+  std::cout << 0 << std::endl;
   return nullptr;
 }
 

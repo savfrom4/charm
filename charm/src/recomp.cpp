@@ -1,4 +1,4 @@
-#include "libcharm/recomp.hpp"
+#include "recomp.hpp"
 #include <chrono>
 #include <stdexcept>
 

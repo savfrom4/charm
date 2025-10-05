@@ -20,17 +20,19 @@
 
 #ifndef LAYER_STACK_SIZE
 #define LAYER_STACK_SIZE                                                       \
-  (1024 * 1024 * 4) // Size of the stack (4 MiB, must be word-aligned)
+  (1024 * 1024 * 16) // Size of the stack (16 MiB, must be word-aligned)
 #endif
 
 #ifndef LAYER_MEMORY_SIZE
 #define LAYER_MEMORY_SIZE                                                      \
-  (1024 * 1024 * 64) // Size of the memory (16 MiB, must be world-aligned)
+  (1024 * 1024 * 64) // Size of the memory (64 MiB, must be word-aligned)
 #endif
 
 #ifndef LAYER_MEMORY_BLOCK_SIZE
 #define LAYER_MEMORY_BLOCK_SIZE (64) // Min allocation (must be word-aligned)
 #endif
+
+#define LAYER_STACK_ON_STACK_LIMIT (1024 * 1024 * 4)
 
 namespace layer {
 
@@ -61,29 +63,43 @@ enum Register : std::uint8_t {
 
 class ExecutionState {
 public:
-// connection to the debugger is not always present
-#ifdef LAYER_DEBUG
-  Debugee dbe{*this};
-#endif
-
   bool cs, /* carry set */
       vs;  /* overflow set */
   bool mi, /* negative */
       z;   /* zero */
 
   std::array<reg_value_t, REG_COUNT> r = {
-      0, 0,
-      0, 0,
-      0, 0,
-      0, 0,
-      0, 0,
-      0, 0,
-      0, LAYER_STACK_BASE + LAYER_STACK_SIZE - 1, // stack pointer
-      0, 0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      LAYER_STACK_BASE + LAYER_STACK_SIZE, // stack pointer
+      0,
+      0,
   };
 
-  std::array<uint8_t, LAYER_STACK_SIZE> stack = {0}; /* stack */
-  std::vector<uint8_t> memory;                       /* memory */
+  // if stack size is too big, we switch to heap
+#if LAYER_STACK_SIZE > LAYER_STACK_ON_STACK_LIMIT
+  std::vector<uint8_t> stack; /* stack */
+#else
+  std::array<uint8_t, LAYER_STACK_SIZE> stack = {0}; /* stack + word */
+#endif
+
+  std::vector<uint8_t> memory; /* memory */
+
+// connection to the debugger is not always present
+#ifdef LAYER_DEBUG
+  Debugee dbe{*this};
+#endif
 
   inline ExecutionState() { memory_init(); }
   inline virtual ~ExecutionState() {}
@@ -92,23 +108,23 @@ public:
   inline ExecutionState &operator=(const ExecutionState &) = delete;
 
   // Memory
-  void memory_init();
-  void *memory_alloc(std::uint32_t size);
+  template <typename T = void *> inline T memory_alloc(std::uint32_t size) {
+    static_assert(std::is_pointer_v<T>, "T must be a pointer!");
+    return reinterpret_cast<T>(memory_alloc_raw(size));
+  }
   void memory_free(void *p);
 
   // Addressing
-  template <typename T> inline std::uint32_t address_map(T address) {
+  template <typename T = void *> inline std::uint32_t address_map(T address) {
     static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-    return address_map(reinterpret_cast<std::uintptr_t>(address));
+    return address_map_raw(reinterpret_cast<std::uintptr_t>(address));
   }
 
-  template <typename T> inline T address_resolve(std::uint32_t address) {
+  template <typename T = void *>
+  inline T address_resolve(std::uint32_t address) {
     static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-    return reinterpret_cast<T>(address_resolve(address));
+    return reinterpret_cast<T>(address_resolve_raw(address));
   }
-
-  virtual std::uint32_t address_map(std::uintptr_t address);
-  virtual std::uintptr_t address_resolve(std::uint32_t address);
 
   // armv4.cpp
 
@@ -155,7 +171,15 @@ public:
 
   // TODO: implement armv5, add thumbv1
 
+protected:
+  void *memory_alloc_raw(std::uint32_t size);
+
+  virtual std::uint32_t address_map_raw(std::uintptr_t address);
+  virtual std::uintptr_t address_resolve_raw(std::uint32_t address);
+
 private:
+  void memory_init();
+
   std::mutex _memory_lock;
 };
 

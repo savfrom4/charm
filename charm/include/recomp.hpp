@@ -1,5 +1,5 @@
 #pragma once
-#include "libcharm/arm.hpp"
+#include "arm.hpp"
 #include <elfio/elfio.hpp>
 #include <string>
 #include <unordered_map>
@@ -19,6 +19,7 @@ struct Function {
 class Recompiler {
 public:
   Recompiler(const std::string &elf_exe, bool minify = false);
+
   void emit(const std::string &output_dir);
 
 private:
@@ -79,7 +80,7 @@ private:
     snprintf(buffer, 512, fmt, args...);
 
     os << std::hex << "throw std::runtime_error(\"" << buffer << " (addr = 0x"
-       << address << ", raw=0x" << instr.raw << ")\")";
+       << address << ", raw=0x" << instr.value << ")\")";
   }
 
   /* Utils */

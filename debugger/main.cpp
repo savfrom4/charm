@@ -110,7 +110,6 @@ void debugger_start(struct addrinfo *info) {
     throw std::runtime_error("debugger_start: failed to connect.");
   }
 
-  // disable nagle's algorithm
   int one = 1;
   if (setsockopt(connection, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) < 0) {
     throw std::runtime_error("ExecutionDebugee ctor: failed to set NODELAY.");
