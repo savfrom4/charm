@@ -1,4 +1,4 @@
-libcharm = executable(
+executable(
   'charm',
 
   include_directories: [
@@ -7,8 +7,8 @@ libcharm = executable(
   ],
 
   sources: files(
-    'src/main.cpp'
     'src/arm.cpp',
+    'src/main.cpp',
     'src/recomp.cpp',
     'src/recomp_analysis.cpp',
     'src/recomp_emit.cpp',

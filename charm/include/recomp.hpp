@@ -58,9 +58,8 @@ private:
                               arm::addr_t address);
   void emit_arm_branch(std::ostream &os, const arm::Instruction &instr,
                        arm::addr_t address);
-  void emit_arm_single_data_transfer(std::ostream &os,
-                                     const arm::Instruction &instr,
-                                     arm::addr_t address);
+  void emit_arm_data_transfer(std::ostream &os, const arm::Instruction &instr,
+                              arm::addr_t address);
   void emit_arm_halfword_data_transfer(std::ostream &os,
                                        const arm::Instruction &instr,
                                        arm::addr_t address);

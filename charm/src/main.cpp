@@ -121,10 +121,7 @@ void disassemble(std::ofstream &ofs, ELFIO::section *section) {
     memcpy(&instr_raw, data + i, sizeof(charm::arm::instr_t));
 
     ofs << "\t0x" << std::hex << section->get_address() + i << ": " << std::dec;
-
-    auto instr = charm::arm::Instruction::decode(instr_raw);
-    instr.dump(ofs);
-    ofs << std::endl;
+    ofs << charm::arm::Instruction::decode(instr_raw).dump() << std::endl;
   }
 
   ofs << std::endl;

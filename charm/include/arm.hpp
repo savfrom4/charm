@@ -54,7 +54,6 @@ enum class Opcode : std::uint8_t {
   MVN, // move not
 
   COUNT,
-  INVALID,
 };
 
 enum class Condition : std::uint8_t {
@@ -78,6 +77,7 @@ enum class Condition : std::uint8_t {
   COUNT,
 };
 
+// 4.5.2 Shifts
 struct Shifter {
   enum {
     LSL, // logical shift left
@@ -94,9 +94,10 @@ struct Shifter {
   static Shifter decode(instr_t value);
 };
 
+// 4.5 Data Processing
 struct DataProcessing {
-  Opcode op = Opcode::INVALID;
-  Register rd, rn;
+  Opcode op;
+  Register rn, rd;
 
   union {
     Shifter op2_reg;
@@ -106,6 +107,7 @@ struct DataProcessing {
   static DataProcessing decode(Instruction &instr, instr_t value);
 };
 
+// 4.7 Multiply and Multiply-Accumulate (MUL, MLA)
 struct Multiply {
   bool accumulate;
   Register rd, rn, rs, rm;
@@ -113,6 +115,7 @@ struct Multiply {
   static Multiply decode(Instruction &instr, instr_t value);
 };
 
+// 4.8 Multiply Long and Multiply-Accumulate Long (MULL,MLAL)
 struct MultiplyLong {
   bool sign;             // unsigned (0) or signed (1)
   bool accumulate;       // accumulate or not
@@ -122,6 +125,7 @@ struct MultiplyLong {
   static MultiplyLong decode(Instruction &instr, instr_t value);
 };
 
+// 4.9 Single Data Transfer (LDR, STR)
 struct DataTransfer {
   bool pre_indx; // add offset after (0) or before (1) transfer?
   bool add;      // subtract (0) or add (1) offset from base?
@@ -139,6 +143,7 @@ struct DataTransfer {
   static DataTransfer decode(Instruction &instr, instr_t value);
 };
 
+// 4.10 Halfword and Signed Data Transfer
 struct HalfWordDataTransfer {
   bool pre_indx;   // add offset after (0) or before (1) transfer?
   bool add;        // subtract (0) or add (1) offset from base?
@@ -148,10 +153,10 @@ struct HalfWordDataTransfer {
   Register rn, rd;
 
   enum {
-    SWP = 0b00, // SWP
-    UHW = 0b01, // unsigned half-word
-    SB = 0b10,  // signed byte
-    SHW = 0b11, // signed half-word
+    SWP = 0b00,              // SWP (decoded seperatley)
+    HALF_WORD = 0b01,        // unsigned half-word
+    SIGNED_BYTE = 0b10,      // signed byte
+    SIGNED_HALF_WORD = 0b11, // signed half-word
   } type;
 
   union {
@@ -163,6 +168,7 @@ struct HalfWordDataTransfer {
                                      bool imm);
 };
 
+// 4.11 Block Data Transfer (LDM, STM)
 struct BlockDataTransfer {
   bool pre_indx;   // add offset after (0) or before (1) transfer?
   bool add;        // subtract (0) or add (1) offset from base?
@@ -176,6 +182,7 @@ struct BlockDataTransfer {
   static BlockDataTransfer decode(instr_t value);
 };
 
+// 4.12 Single Data Swap (SWP)
 struct DataSwap {
   bool byte;
   Register rn, rd, rm;
@@ -183,6 +190,7 @@ struct DataSwap {
   static DataSwap decode(instr_t value);
 };
 
+// 4.4 Branch and Branch with Link (B, BL)
 struct Branch {
   bool link;           // write address to link register?
   std::int32_t offset; // NOTE: signed offset
@@ -190,12 +198,14 @@ struct Branch {
   static Branch decode(instr_t value);
 };
 
+// 4.3 Branch and Exchange (BX)
 struct BranchEx {
   Register rm;
 
   static BranchEx decode(instr_t value);
 };
 
+// 4.13 Software Interrupt (SWI)
 struct SWI {
   static SWI decode(instr_t value);
 };

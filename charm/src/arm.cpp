@@ -1,6 +1,7 @@
 #include "arm.hpp"
 #include "utils.hpp"
 #include <array>
+#include <inttypes.h>
 #include <sstream>
 
 const std::array<std::string, (int)charm::arm::Opcode::COUNT> OPCODE_TABLE = {
@@ -148,27 +149,26 @@ Shifter Shifter::decode(instr_t value) {
 
 // 4.5 Data Processing
 DataProcessing DataProcessing::decode(Instruction &instr, instr_t value) {
-  instr.immediate = get_bits<25>(value); /* Immediate, bit 25 */
-
-  DataProcessing data;
-  data.op =
-      static_cast<Opcode>(get_bits<21, 4>(value)); /* Opcode, bits 21-24 */
+  instr.immediate = get_bits<25>(value);  /* Immediate, bit 25 */
   instr.set_cflags = get_bits<20>(value); /* Set condition flags, bit 20 */
 
-  data.rn = static_cast<Register>(
-      get_bits<16, 4>(value)); /* Rn register, bits 16-19 */
-  data.rd = static_cast<Register>(
-      get_bits<12, 4>(value)); /* Rd register, bits 12-15 */
+  DataProcessing data = {
+      .op =
+          static_cast<Opcode>(get_bits<21, 4>(value)), /* Opcode, bits 21-24 */
+      .rn = static_cast<Register>(
+          get_bits<16, 4>(value)), /* Rn register, bits 16-19 */
+      .rd = static_cast<Register>(
+          get_bits<12, 4>(value)), /* Rd register, bits 12-15 */
+  };
 
   // Operand 2
   if (instr.immediate) {
     std::uint32_t rotate =
         get_bits<8, 4>(value); /* Amount to rotate by, bits 8-11 */
 
-    std::uint32_t value = get_bits<0, 8>(value); /* Value, bits 0-7 */
-
+    std::uint32_t imm = get_bits<0, 8>(value); /* Value, bits 0-7 */
     rotate *= 2;
-    data.op2_imm = (value >> rotate) | (value << (32 - rotate));
+    data.op2_imm = (imm >> rotate) | (imm << (32 - rotate));
   } else {
     data.op2_reg = Shifter::decode(value);
   }
@@ -208,35 +208,6 @@ MultiplyLong MultiplyLong::decode(Instruction &instr, instr_t value) {
           get_bits<8, 4>(value)), /* Rs register, bits 8-11 */
       .rm = static_cast<Register>(
           get_bits<0, 4>(value)), /* Rm register, bits 0-3 */
-  };
-}
-
-// 4.4 Branch and Branch with Link (B, BL)
-Branch Branch::decode(instr_t value) {
-  return {
-      .link = (bool)get_bits<24>(value), /* Link, bit 24 */
-      .offset = sign_extend<26>((get_bits<0, 24>(value))
-                                << 2), /* Offset, bits 0-23 */
-  };
-}
-
-// 4.3 Branch and Exchange (BX)
-BranchEx BranchEx::decode(instr_t value) {
-  return {
-      .rm = static_cast<Register>(get_bits<0, 4>(value)), /* Rn, bit 24 */
-  };
-}
-
-// 4.12 Single Data Swap (SWP)
-DataSwap DataSwap::decode(instr_t value) {
-  return {
-      .byte = (bool)get_bits<22>(value), /* Byte/Word, bit 22  */
-      .rn = static_cast<Register>(
-          get_bits<16, 4>(value)), /* Rn base register, bits 16-19 */
-      .rd = static_cast<Register>(
-          get_bits<12, 4>(value)), /* Rd dst register, bits 12-15 */
-      .rm = static_cast<Register>(
-          get_bits<0, 4>(value)), /* Rm src register, bits 0-3 */
   };
 }
 
@@ -311,34 +282,66 @@ BlockDataTransfer BlockDataTransfer::decode(instr_t value) {
   };
 }
 
+// 4.12 Single Data Swap (SWP)
+DataSwap DataSwap::decode(instr_t value) {
+  return {
+      .byte = (bool)get_bits<22>(value), /* Byte/Word, bit 22  */
+      .rn = static_cast<Register>(
+          get_bits<16, 4>(value)), /* Rn base register, bits 16-19 */
+      .rd = static_cast<Register>(
+          get_bits<12, 4>(value)), /* Rd dst register, bits 12-15 */
+      .rm = static_cast<Register>(
+          get_bits<0, 4>(value)), /* Rm src register, bits 0-3 */
+  };
+}
+
+// 4.4 Branch and Branch with Link (B, BL)
+Branch Branch::decode(instr_t value) {
+  return {
+      .link = (bool)get_bits<24>(value), /* Link, bit 24 */
+      .offset = sign_extend<26>((get_bits<0, 24>(value))
+                                << 2), /* Offset, bits 0-23 */
+  };
+}
+
+// 4.3 Branch and Exchange (BX)
+BranchEx BranchEx::decode(instr_t value) {
+  return {
+      .rm = static_cast<Register>(get_bits<0, 4>(value)), /* Rn, bit 24 */
+  };
+}
+
 // 4.13 Software Interrupt (SWI)
 SWI SWI::decode(instr_t value) { return {}; }
 
 std::string Instruction::dump() const {
   std::stringstream ss;
-  ss << std::dec;
-  ss << sformat("(%s) ", COND_TABLE[(int)condition]);
+
+  // add condition prefix
+  ss << utils::sformat("(%s) ", COND_TABLE[(int)condition]);
 
   switch ((InstructionGroup)group.index()) {
 
   case InstructionGroup::DATA_PROCESSING: {
-    auto data = std::get<DataProcessing>(group);
+    const auto &data = std::get<DataProcessing>(group);
 
     // opcode, rd, rn
-    ss << sformat("%s %s, %s, ", OPCODE_TABLE[(int)data.op],
-                  REGISTER_TABLE[(int)data.rd], REGISTER_TABLE[(int)data.rn]);
+    ss << utils::sformat("%s\t%s, %s, ", OPCODE_TABLE[(int)data.op],
+                         REGISTER_TABLE[(int)data.rd],
+                         REGISTER_TABLE[(int)data.rn]);
 
     if (immediate) { // #imm
-      ss << sformat("#%u", data.op2_imm);
+      ss << utils::sformat("#%" PRIu32, data.op2_imm);
     } else { // rm
       ss << REGISTER_TABLE[(int)data.op2_reg.rm];
 
       // , shift
       if (data.op2_reg.amount_or_rs != 0) {
-        ss << sformat(", %s %s", SHIFT_TABLE[(int)data.op2_reg.type],
-                      (data.op2_reg.is_reg
-                           ? REGISTER_TABLE[data.op2_reg.amount_or_rs]
-                           : sformat("#%u", data.op2_reg.amount_or_rs)));
+        ss << utils::sformat(
+            ", %s %s", SHIFT_TABLE[(int)data.op2_reg.type],
+            (data.op2_reg.is_reg
+                 ? REGISTER_TABLE[(int)data.op2_reg.amount_or_rs]
+                 : utils::sformat("#%" PRIu8, data.op2_reg.amount_or_rs)));
       }
     }
 
@@ -346,12 +349,13 @@ std::string Instruction::dump() const {
   }
 
   case InstructionGroup::MULTIPLY: {
-    auto mul = std::get<Multiply>(group);
+    const auto &mul = std::get<Multiply>(group);
 
     // mul/mla rd, rm, rs
-    ss << sformat("%s %s, %s, %s", (mul.accumulate ? "mla" : "mul"),
-                  REGISTER_TABLE[(int)mul.rd], REGISTER_TABLE[(int)mul.rm],
-                  REGISTER_TABLE[(int)mul.rs]);
+    ss << utils::sformat("%s\t%s, %s, %s", (mul.accumulate ? "mla" : "mul"),
+                         REGISTER_TABLE[(int)mul.rd],
+                         REGISTER_TABLE[(int)mul.rm],
+                         REGISTER_TABLE[(int)mul.rs]);
 
     // , rn
     if (mul.accumulate) {
@@ -362,51 +366,59 @@ std::string Instruction::dump() const {
   }
 
   case InstructionGroup::MULTIPLY_LONG: {
-    auto mul_long = std::get<MultiplyLong>(group);
+    const auto &mul_long = std::get<MultiplyLong>(group);
 
     // prefix
     ss << (mul_long.sign ? "s" : "u");
 
     // (s/u)mul/mlal rd_lo, rd_hi, rm, rs
-    ss << sformat("%s %s, %s, %s, %s", mul_long.accumulate ? "mlal" : "mull",
-                  REGISTER_TABLE[(int)mul_long.rd_lo],
-                  REGISTER_TABLE[(int)mul_long.rd_hi],
-                  REGISTER_TABLE[(int)mul_long.rm],
-                  REGISTER_TABLE[(int)mul_long.rs]);
+    ss << utils::sformat(
+        "%s\t%s, %s, %s, %s", mul_long.accumulate ? "mlal" : "mull",
+        REGISTER_TABLE[(int)mul_long.rd_lo],
+        REGISTER_TABLE[(int)mul_long.rd_hi], REGISTER_TABLE[(int)mul_long.rm],
+        REGISTER_TABLE[(int)mul_long.rs]);
     break;
   }
 
   case InstructionGroup::DATA_TRANSFER: {
-    if (data_trans.write_back && data_trans.rn == Register::SP) {
-      os << (data_trans.load ? "pop" : "push");
-    } else {
-      os << (data_trans.load ? "ldr" : "str");
+    const auto &data_trans = std::get<DataTransfer>(group);
+
+    // push/pop rd
+    if (immediate && data_trans.write_back && data_trans.rn == Register::SP &&
+        data_trans.offset_imm == 4 && data_trans.add == data_trans.load) {
+      ss << utils::sformat("%s\t{%s}", data_trans.load ? "pop" : "push",
+                           REGISTER_TABLE[(int)data_trans.rd]);
+      break;
     }
 
-    if (data_trans.byte) {
-      ss << "b";
-    }
+    // ldr/str(b) rd, [rn
+    ss << utils::sformat("%s%s\t%s, [%s", data_trans.load ? "ldr" : "str",
+                         data_trans.byte ? "b" : "",
+                         REGISTER_TABLE[(int)data_trans.rd],
+                         REGISTER_TABLE[(int)data_trans.rn]);
 
-    os << " " << REGISTER_TABLE[(int)data_trans.rd] << ", [";
-    os << REGISTER_TABLE[(int)data_trans.rn];
-
+    // close the square bracket if post indexed
     if (!data_trans.pre_indx) {
       ss << "]";
     }
 
     if (immediate) {
-      if (data_trans.offset_imm != 0)
-        os << ", #" << (data_trans.add ? "" : "-")
-           << (uint32_t)data_trans.offset_imm;
+      //, #imm
+      ss << utils::sformat(", #%s%" PRIu16, data_trans.add ? "" : "-",
+                           data_trans.offset_imm);
     } else {
-      os << ", " << REGISTER_TABLE[(int)data_trans.offset_reg.rm];
+      ss << REGISTER_TABLE[(int)data_trans.offset_reg.rm];
+
+      // , shift
       if (data_trans.offset_reg.amount_or_rs != 0) {
-        os << ", " << SHIFT_TABLE[(int)data_trans.offset_reg.type] << " ";
-        if (data_trans.offset_reg.is_reg) {
-          os << REGISTER_TABLE[data_trans.offset_reg.amount_or_rs];
-        } else {
-          os << "#" << (int)data_trans.offset_reg.amount_or_rs;
-        }
+        ss << utils::sformat(
+            ", %s%s", SHIFT_TABLE[(int)data_trans.offset_reg.type],
+            (data_trans.offset_reg.is_reg
+                 ? utils::sformat(
+                       ", %s",
+                       REGISTER_TABLE[data_trans.offset_reg.amount_or_rs])
+                 : utils::sformat(" #%" PRIu8,
+                                  data_trans.offset_reg.amount_or_rs)));
       }
     }
 
@@ -422,54 +434,56 @@ std::string Instruction::dump() const {
   }
 
   case InstructionGroup::HALFWORD_DATA_TRANSFER: {
-    os << (hw_data_trans.load ? "ldr" : "str");
+    const auto &hw_data_trans = std::get<HalfWordDataTransfer>(group);
 
-    switch (hw_data_trans.type) {
-    case HalfWordTransferType::UHW:
-      ss << "h";
-      break;
-    case HalfWordTransferType::SWP:
-      ss << "swp";
-      break;
-    case HalfWordTransferType::SB:
-      ss << "sb";
-      break;
-    case HalfWordTransferType::SHW:
-      ss << "shr";
-      break;
+    const std::array<std::string, 4> type_table = {
+        "(INVALID)",
+        "h",
+        "sb",
+        "shw",
+    };
+
+    ss << utils::sformat("%s%s\t%s, [%s", hw_data_trans.load ? "ldr" : "str",
+                         type_table[(int)hw_data_trans.type],
+                         REGISTER_TABLE[(int)hw_data_trans.rd],
+                         REGISTER_TABLE[(int)hw_data_trans.rn]);
+
+    // close the square bracket if post indexed
+    if (!hw_data_trans.pre_indx) {
+      ss << "]";
     }
-
-    os << " " << REGISTER_TABLE[(int)hw_data_trans.rd] << ", [";
-    os << REGISTER_TABLE[(int)hw_data_trans.rn];
 
     if (immediate) {
-      if (hw_data_trans.offset_imm != 0)
-        os << ", #" << (uint32_t)hw_data_trans.offset_imm;
+      //, #imm
+      ss << utils::sformat(", #%s" PRIu8, hw_data_trans.add ? "" : "-",
+                           hw_data_trans.offset_imm);
     } else {
-      os << ", " << REGISTER_TABLE[(int)hw_data_trans.offset_reg];
+      //, reg
+      ss << REGISTER_TABLE[(int)hw_data_trans.offset_reg];
     }
 
-    ss << "]";
+    if (hw_data_trans.pre_indx) {
+      ss << "]";
 
-    if (data_trans.write_back)
-      ss << "!";
+      if (hw_data_trans.write_back) {
+        ss << "!";
+      }
+    }
 
     break;
   }
 
   case InstructionGroup::BLOCK_DATA_TRANSFER: {
-    if (blk_data_trans.write_back && blk_data_trans.rn == Register::SP) {
-      os << (blk_data_trans.load ? "pop" : "push");
+    const auto &blk_data_trans = std::get<BlockDataTransfer>(group);
+
+    if (blk_data_trans.rn == Register::SP && blk_data_trans.write_back) {
+      ss << utils::sformat("%s\t{", (blk_data_trans.load ? "pop" : "push"));
     } else {
-      os << (blk_data_trans.load ? "ldm" : "stm");
-      os << " " << REGISTER_TABLE[(int)blk_data_trans.rn];
-
-      if (blk_data_trans.pre_indx && blk_data_trans.write_back) {
-        ss << "!";
-      }
+      // ldm/stm rn(!), {}
+      ss << utils::sformat("%s\t%s%s, {", blk_data_trans.load ? "ldm" : "stm",
+                           REGISTER_TABLE[(int)blk_data_trans.rn],
+                           blk_data_trans.write_back ? "!" : "");
     }
-
-    ss << ", {";
 
     bool first = true;
     for (int i = 0; i < 16; ++i) {
@@ -483,46 +497,39 @@ std::string Instruction::dump() const {
     }
 
     ss << "}";
-
-    if (blk_data_trans.pre_indx) {
-      break;
-    }
-
     break;
   }
 
   case InstructionGroup::DATA_SWAP: {
-    auto data_swap = std::get<DataSwap>(group);
+    const auto &data_swap = std::get<DataSwap>(group);
 
     // swpb/swp rd, rm, [rn]
-    ss << sformat("%s %s, %s, [%s]", data_swap.byte ? "swpb " : "swp ",
-                  REGISTER_TABLE[(int)data_swap.rd],
-                  REGISTER_TABLE[(int)data_swap.rm],
-                  REGISTER_TABLE[(int)data_swap.rn]);
+    ss << utils::sformat("%s\t%s, %s, [%s]", data_swap.byte ? "swpb " : "swp ",
+                         REGISTER_TABLE[(int)data_swap.rd],
+                         REGISTER_TABLE[(int)data_swap.rm],
+                         REGISTER_TABLE[(int)data_swap.rn]);
     break;
   }
 
   case InstructionGroup::BRANCH: {
-    auto branch = std::get<Branch>(group);
+    const auto &branch = std::get<Branch>(group);
 
     // b #imm
-    ss << sformat("%s #%d", (branch.link ? "bl " : "b "), branch.offset);
+    ss << utils::sformat("%s\t#%" PRId32, (branch.link ? "bl " : "b "),
+                         branch.offset);
     break;
   }
 
   case InstructionGroup::BRANCH_EXCHANGE: {
-    auto branchex = std::get<BranchEx>(group);
-    ss << sformat("bx %d", REGISTER_TABLE[(int)branchex.rm]);
+    const auto &branchex = std::get<BranchEx>(group);
+
+    // b rm
+    ss << utils::sformat("bx\t%s", REGISTER_TABLE[(int)branchex.rm]);
     break;
   }
 
   case InstructionGroup::SWI: {
     ss << "swi";
-    break;
-  }
-
-  case InstructionGroup::INVALID: {
-    ss << "invalid";
     break;
   }
   }

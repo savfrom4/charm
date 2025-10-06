@@ -41,7 +41,7 @@ void Recompiler::step_emit(const std::string &output_dir) {
   emit_data_source(output_dir);
 }
 
-void Recompiler::ac(const std::string &output_dir) {
+void Recompiler::emit_meson_options(const std::string &output_dir) {
   auto meson_options_path = std::filesystem::path{
       std::filesystem::path{output_dir} / "meson_options.txt"};
 
