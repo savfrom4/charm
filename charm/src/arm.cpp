@@ -15,6 +15,15 @@ const std::array<std::string, (int)charm::arm::Register::COUNT> REGISTER_TABLE =
         "r8", "r9", "r10", "r11", "ip", "sp", "lr", "pc",
 };
 
+struct A {
+  int x;
+  char y;
+};
+struct B {
+  char y;
+  int x;
+};
+
 const std::array<std::string, 4> SHIFT_TABLE = {
     "lsl",
     "lsr",
