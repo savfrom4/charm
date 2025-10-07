@@ -1,5 +1,6 @@
 #pragma once
 #include "arm.hpp"
+#include "template.hpp"
 #include <elfio/elfio.hpp>
 #include <string>
 #include <unordered_map>
@@ -42,9 +43,9 @@ private:
 
   /* Section level */
 
-  void emit_code_address_mappings(std::ofstream &ofs);
-  void emit_code_stubs(std::ofstream &ofs);
-  void emit_code_section(std::ofstream &ofs, const ELFIO::section *section);
+  void emit_code_address_mappings(Template &tl);
+  void emit_code_stubs(Template &tl);
+  void emit_code_section(std::ostream &os, const ELFIO::section *section);
 
   /* Instruction level */
 

@@ -33,256 +33,261 @@ const std::array<size_t, (int)layer::DebugCommand::COUNT> COMMAND_SIZE_TABLE = {
 namespace layer {
 
 Debugee::Debugee(ExecutionState &_ps) : _ps(_ps) {
-  _socket = socket(AF_INET, SOCK_STREAM, 0);
-  if (_socket < 0) {
-    throw std::runtime_error("ExecutionDebugee ctor: failed to create socket.");
-  }
+	_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (_socket < 0) {
+		throw std::runtime_error(
+		    "ExecutionDebugee ctor: failed to create socket.");
+	}
 
-  struct sockaddr_in address = {
-      .sin_family = AF_INET,
-      .sin_port = htons(LAYER_DEBUG_PORT),
-      .sin_addr = {.s_addr = INADDR_ANY},
-      .sin_zero = {0},
-  };
+	struct sockaddr_in address = {
+	    .sin_family = AF_INET,
+	    .sin_port = htons(LAYER_DEBUG_PORT),
+	    .sin_addr = {.s_addr = INADDR_ANY},
+	    .sin_zero = {0},
+	};
 
-  if (bind(_socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
-    throw std::runtime_error("ExecutionDebugee ctor: failed to bind socket.");
-  }
+	if (bind(_socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
+		throw std::runtime_error(
+		    "ExecutionDebugee ctor: failed to bind socket.");
+	}
 
-  std::cout << "> Waitng for debugger on port " << LAYER_DEBUG_PORT << "..."
-            << std::endl;
+	std::cout << "> Waitng for debugger on port " << LAYER_DEBUG_PORT << "..."
+	          << std::endl;
 
-  if (listen(_socket, 1) < 0) {
-    throw std::runtime_error(
-        "ExecutionDebugee ctor: failed to listen on socket.");
-  }
+	if (listen(_socket, 1) < 0) {
+		throw std::runtime_error(
+		    "ExecutionDebugee ctor: failed to listen on socket.");
+	}
 
-  socklen_t address_len;
-  if (!(_connection =
-            accept(_socket, (struct sockaddr *)&address, &address_len))) {
-    throw std::runtime_error(
-        "ExecutionDebugee ctor: failed to accept the connection.");
-  }
+	socklen_t address_len;
+	if (!(_connection =
+	          accept(_socket, (struct sockaddr *)&address, &address_len))) {
+		throw std::runtime_error(
+		    "ExecutionDebugee ctor: failed to accept the connection.");
+	}
 
-  // disable nagle's algorithm
-  int one = 1;
-  if (setsockopt(_connection, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) <
-      0) {
-    throw std::runtime_error("ExecutionDebugee ctor: failed to set NODELAY.");
-  }
+	// disable nagle's algorithm
+	int one = 1;
+	if (setsockopt(_connection, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) <
+	    0) {
+		throw std::runtime_error(
+		    "ExecutionDebugee ctor: failed to set NODELAY.");
+	}
 
-  std::cout << "> Connection established!" << std::endl;
+	std::cout << "> Connection established!" << std::endl;
 
-  send_format("Waiting for user input...");
-  stall();
+	send_format("Waiting for user input...");
+	stall();
 }
 
 Debugee::~Debugee() {
-  send_format("Reached program's end. Continuing will close the connection.");
-  send_paused();
-  stall();
+	send_format("Reached program's end. Continuing will close the connection.");
+	send_paused();
+	stall();
 
-  if (_socket >= 0) {
-    close(_socket);
-  }
+	if (_socket >= 0) {
+		close(_socket);
+	}
 
-  if (_connection >= 0) {
-    close(_connection);
-  }
+	if (_connection >= 0) {
+		close(_connection);
+	}
 }
 
 void Debugee::next() {
-  if (flags & NEXT) {
-    flags &= ~NEXT; // clear flag
+	if (flags & NEXT) {
+		flags &= ~NEXT; // clear flag
 
-    send_message();
-    send_paused();
-  }
+		send_message();
+		send_paused();
+	}
 
-  stall();
+	stall();
 }
 
 void Debugee::skip() {
-  bool is_breakpoint = _breakpoints.count(_ps.r[PC] - 8);
+	bool is_breakpoint = _breakpoints.count(_ps.r[PC] - 8);
 
-  if (is_breakpoint || flags & SKIP) {
-    flags &= ~SKIP; // clear flag
+	if (is_breakpoint || flags & SKIP) {
+		flags &= ~SKIP; // clear flag
 
-    send_message();
+		send_message();
 
-    if (is_breakpoint) {
-      send_format("Breakpoint hit.");
-    }
+		if (is_breakpoint) {
+			send_format("Breakpoint hit.");
+		}
 
-    send_paused();
-  } else if (flags & NEXT) {
-    send_message();
-    send_paused();
-  }
+		send_paused();
+	} else if (flags & NEXT) {
+		send_message();
+		send_paused();
+	}
 
-  stall();
+	stall();
 }
 
 void Debugee::send_paused() {
-  flags |= PAUSED; // pause
+	flags |= PAUSED; // pause
 
-  std::uint32_t length = 0; // sending length 0 is pause request
-  write(_connection, &length, sizeof(length));
+	std::uint32_t length = 0; // sending length 0 is pause request
+	write(_connection, &length, sizeof(length));
 
-  stall();
+	stall();
 }
 
 void Debugee::send_message() {
-  auto temp_buffer_ptr = _temp_buffer.data();
+	auto temp_buffer_ptr = _temp_buffer.data();
 
-  std::uint32_t length = std::strlen(temp_buffer_ptr);
-  std::memmove(temp_buffer_ptr + sizeof(length), temp_buffer_ptr, length + 1);
+	std::uint32_t length = std::strlen(temp_buffer_ptr);
+	std::memmove(temp_buffer_ptr + sizeof(length), temp_buffer_ptr, length + 1);
 
-  length = htonl(length);
-  std::memcpy(temp_buffer_ptr, &length, sizeof(length));
-  length = ntohl(length);
+	length = htonl(length);
+	std::memcpy(temp_buffer_ptr, &length, sizeof(length));
+	length = ntohl(length);
 
-  write(_connection, temp_buffer_ptr, length + sizeof(length));
+	write(_connection, temp_buffer_ptr, length + sizeof(length));
 }
 
 bool Debugee::poll(int timeout) {
-  struct pollfd fd = {
-      .fd = _connection,
-      .events = POLLIN,
-      .revents = 0,
-  };
+	struct pollfd fd = {
+	    .fd = _connection,
+	    .events = POLLIN,
+	    .revents = 0,
+	};
 
-  int result = ::poll(&fd, 1, timeout);
-  if (result == 0) {
-    return false; /* nothing, still wait */
-  }
+	int result = ::poll(&fd, 1, timeout);
+	if (result == 0) {
+		return false; /* nothing, still wait */
+	}
 
-  if (!result) {
-    throw std::runtime_error(
-        "Debugee::poll: invalid file descriptor (connection is lost...?).");
-  }
+	if (!result) {
+		throw std::runtime_error(
+		    "Debugee::poll: invalid file descriptor (connection is lost...?).");
+	}
 
-  return (fd.revents & POLLIN);
+	return (fd.revents & POLLIN);
 }
 
 void Debugee::process(int timeout) {
-  auto temp_buffer_ptr = _temp_buffer.data();
+	auto temp_buffer_ptr = _temp_buffer.data();
 
-  while (poll(timeout)) {
-    ssize_t bytes_read =
-        ::read(_connection, temp_buffer_ptr, sizeof(_temp_buffer));
+	while (poll(timeout)) {
+		ssize_t bytes_read =
+		    ::read(_connection, temp_buffer_ptr, sizeof(_temp_buffer));
 
-    if (!bytes_read) {
-      throw std::runtime_error("Debugee::process: connection is lost.");
-    }
+		if (!bytes_read) {
+			throw std::runtime_error("Debugee::process: connection is lost.");
+		}
 
-    _accum_buffer.insert(_accum_buffer.end(), temp_buffer_ptr,
-                         temp_buffer_ptr + bytes_read);
-  }
+		_accum_buffer.insert(_accum_buffer.end(), temp_buffer_ptr,
+		                     temp_buffer_ptr + bytes_read);
+	}
 
-  // try to read as much as we can
-  while (1) {
-    if (!_accum_buffer.size()) {
-      return;
-    }
+	// try to read as much as we can
+	while (1) {
+		if (!_accum_buffer.size()) {
+			return;
+		}
 
-    // read command type
-    if (_command == DebugCommand::NONE) {
-      std::memcpy(&_command, _accum_buffer.data(), sizeof(_command));
-      _accum_buffer.erase(_accum_buffer.begin());
-    }
+		// read command type
+		if (_command == DebugCommand::NONE) {
+			std::memcpy(&_command, _accum_buffer.data(), sizeof(_command));
+			_accum_buffer.erase(_accum_buffer.begin());
+		}
 
-    if ((int)_command >= COMMAND_SIZE_TABLE.size()) {
-      throw std::runtime_error("Debugee:process: invalid command type: " +
-                               std::to_string((int)_command));
-    }
+		if ((int)_command >= COMMAND_SIZE_TABLE.size()) {
+			throw std::runtime_error("Debugee:process: invalid command type: " +
+			                         std::to_string((int)_command));
+		}
 
-    // not enough data
-    const auto command_size = COMMAND_SIZE_TABLE[(int)_command];
-    if (_accum_buffer.size() < command_size) {
-      return;
-    }
+		// not enough data
+		const auto command_size = COMMAND_SIZE_TABLE[(int)_command];
+		if (_accum_buffer.size() < command_size) {
+			return;
+		}
 
-    process_command();
+		process_command();
 
-    _accum_buffer.erase(_accum_buffer.begin(),
-                        _accum_buffer.begin() + command_size);
-    _command = DebugCommand::NONE;
-  }
+		_accum_buffer.erase(_accum_buffer.begin(),
+		                    _accum_buffer.begin() + command_size);
+		_command = DebugCommand::NONE;
+	}
 }
 
 void Debugee::process_command() {
-  switch (_command) {
-  case DebugCommand::BREAK: {
-    std::uint32_t value;
-    std::memcpy(&value, _accum_buffer.data(), sizeof(value));
-    value = ntohl(value);
+	switch (_command) {
+	case DebugCommand::BREAK: {
+		std::uint32_t value;
+		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+		value = ntohl(value);
 
-    if (_breakpoints.count(value)) {
-      _breakpoints.erase(value);
-      send_format("Breakpoint at 0x%X removed.", value);
-      break;
-    }
+		if (_breakpoints.count(value)) {
+			_breakpoints.erase(value);
+			send_format("Breakpoint at 0x%X removed.", value);
+			break;
+		}
 
-    _breakpoints.emplace(value);
-    send_format("Breakpoint at 0x%X set.", value);
-    break;
-  }
+		_breakpoints.emplace(value);
+		send_format("Breakpoint at 0x%X set.", value);
+		break;
+	}
 
-  case DebugCommand::NEXT: {
-    flags |= NEXT;
-    flags &= ~PAUSED;
-    break;
-  }
+	case DebugCommand::NEXT: {
+		flags |= NEXT;
+		flags &= ~PAUSED;
+		break;
+	}
 
-  case layer::DebugCommand::SKIP: {
-    flags |= SKIP;
-    flags &= ~PAUSED;
-    break;
-  }
+	case layer::DebugCommand::SKIP: {
+		flags |= SKIP;
+		flags &= ~PAUSED;
+		break;
+	}
 
-  case DebugCommand::PAUSE_MODE: {
-    std::uint8_t value;
-    std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+	case DebugCommand::PAUSE_MODE: {
+		std::uint8_t value;
+		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 
-    if (value) {
-      flags |= PAUSED;
-    } else {
-      flags &= ~PAUSED;
-    }
-    break;
-  }
+		if (value) {
+			flags |= PAUSED;
+		} else {
+			flags &= ~PAUSED;
+		}
+		break;
+	}
 
-  case DebugCommand::PRINT_REGISTER: {
-    std::uint32_t value;
-    std::memcpy(&value, _accum_buffer.data(), sizeof(value));
-    value = ntohl(value);
+	case DebugCommand::PRINT_REGISTER: {
+		std::uint32_t value;
+		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+		value = ntohl(value);
 
-    send_format("r%d=0x%X (%u)", value, _ps.r[value], _ps.r[value]);
-    break;
-  }
+		send_format("r%d=0x%X (%u)", value, _ps.r[value], _ps.r[value]);
+		break;
+	}
 
-  case DebugCommand::PRINT_AT_ADDRESS: {
-    std::uint32_t value;
-    std::memcpy(&value, _accum_buffer.data(), sizeof(value));
-    value = ntohl(value);
+	case DebugCommand::PRINT_AT_ADDRESS: {
+		std::uint32_t value;
+		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
+		value = ntohl(value);
 
-    const std::uint8_t *ptr = _ps.address_resolve<const std::uint8_t *>(value);
-    send_format("0x%X=0x%X (%u)", value, *ptr, *ptr);
-    break;
-  }
+		const std::uint8_t *ptr =
+		    _ps.address_resolve<const std::uint8_t *>(value);
+		send_format("0x%X=0x%X (%u)", value, *ptr, *ptr);
+		break;
+	}
 
-  case DebugCommand::DUMP:
-  case DebugCommand::RESTORE:
-    break;
+	case DebugCommand::DUMP:
+	case DebugCommand::RESTORE:
+		break;
 
-  default:
-    throw std::runtime_error("Debugee::process_command: invalid command type.");
-  }
+	default:
+		throw std::runtime_error(
+		    "Debugee::process_command: invalid command type.");
+	}
 }
 
 void Debugee::stall() {
-  while (flags & PAUSED)
-    process(30); // wait for continue
+	while (flags & PAUSED)
+		process(30); // wait for continue
 }
 } // namespace layer

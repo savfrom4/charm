@@ -10,22 +10,22 @@
 
 #ifndef LAYER_STACK_BASE
 #define LAYER_STACK_BASE                                                       \
-  (0xC0000000) // Virtual address of stack pointer (must be word-aligned)
+	(0xC0000000) // Virtual address of stack pointer (must be word-aligned)
 #endif
 
 #ifndef LAYER_MEMORY_BASE
 #define LAYER_MEMORY_BASE                                                      \
-  (0x10000000) // Virtual address of the memory (must be word-aligned)
+	(0x10000000) // Virtual address of the memory (must be word-aligned)
 #endif
 
 #ifndef LAYER_STACK_SIZE
 #define LAYER_STACK_SIZE                                                       \
-  (1024 * 1024 * 16) // Size of the stack (16 MiB, must be word-aligned)
+	(1024 * 1024 * 16) // Size of the stack (16 MiB, must be word-aligned)
 #endif
 
 #ifndef LAYER_MEMORY_SIZE
 #define LAYER_MEMORY_SIZE                                                      \
-  (1024 * 1024 * 64) // Size of the memory (64 MiB, must be word-aligned)
+	(1024 * 1024 * 64) // Size of the memory (64 MiB, must be word-aligned)
 #endif
 
 #ifndef LAYER_MEMORY_BLOCK_SIZE
@@ -42,145 +42,145 @@ typedef std::uint32_t reg_value_t;
 // but we need it to be easily castable to an integer
 // + compactness
 enum Register : std::uint8_t {
-  R0 = 0,
-  R1 = 1,
-  R2 = 2,
-  R3 = 3,
-  R4 = 4,
-  R5 = 5,
-  R6 = 6,
-  R7 = 7,
-  R8 = 8,
-  R9 = 9,
-  R10 = 10,
-  R11 = 11,
-  R12 = 12,
-  SP = 13,
-  LR = 14,
-  PC = 15,
-  REG_COUNT = 16,
+	R0 = 0,
+	R1 = 1,
+	R2 = 2,
+	R3 = 3,
+	R4 = 4,
+	R5 = 5,
+	R6 = 6,
+	R7 = 7,
+	R8 = 8,
+	R9 = 9,
+	R10 = 10,
+	R11 = 11,
+	R12 = 12,
+	SP = 13,
+	LR = 14,
+	PC = 15,
+	REG_COUNT = 16,
 };
 
 class ExecutionState {
-public:
-  bool cs, /* carry set */
-      vs;  /* overflow set */
-  bool mi, /* negative */
-      z;   /* zero */
+  public:
+	bool cs, /* carry set */
+	    vs;  /* overflow set */
+	bool mi, /* negative */
+	    z;   /* zero */
 
-  std::array<reg_value_t, REG_COUNT> r = {
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      LAYER_STACK_BASE + LAYER_STACK_SIZE, // stack pointer
-      0,
-      0,
-  };
+	std::array<reg_value_t, REG_COUNT> r = {
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    LAYER_STACK_BASE + LAYER_STACK_SIZE, // stack pointer
+	    0,
+	    0,
+	};
 
-  // if stack size is too big, we switch to heap
+	// if stack size is too big, we switch to heap
 #if LAYER_STACK_SIZE > LAYER_STACK_ON_STACK_LIMIT
-  std::vector<uint8_t> stack; /* stack */
+	std::vector<uint8_t> stack; /* stack */
 #else
-  std::array<uint8_t, LAYER_STACK_SIZE> stack = {0}; /* stack + word */
+	std::array<uint8_t, LAYER_STACK_SIZE> stack = {0}; /* stack + word */
 #endif
 
-  std::vector<uint8_t> memory; /* memory */
+	std::vector<uint8_t> memory; /* memory */
 
 // connection to the debugger is not always present
 #ifdef LAYER_DEBUG
-  Debugee dbe{*this};
+	Debugee dbe{*this};
 #endif
 
-  inline ExecutionState() { memory_init(); }
-  inline virtual ~ExecutionState() {}
+	inline ExecutionState() { memory_init(); }
+	inline virtual ~ExecutionState() {}
 
-  inline ExecutionState(const ExecutionState &) = delete;
-  inline ExecutionState &operator=(const ExecutionState &) = delete;
+	inline ExecutionState(const ExecutionState &) = delete;
+	inline ExecutionState &operator=(const ExecutionState &) = delete;
 
-  // Memory
-  template <typename T = void *> inline T memory_alloc(std::uint32_t size) {
-    static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-    return reinterpret_cast<T>(memory_alloc_raw(size));
-  }
-  void memory_free(void *p);
+	// Memory
+	template <typename T = void *> inline T memory_alloc(std::uint32_t size) {
+		static_assert(std::is_pointer_v<T>, "T must be a pointer!");
+		return reinterpret_cast<T>(memory_alloc_raw(size));
+	}
+	void memory_free(void *p);
 
-  // Addressing
-  template <typename T = void *> inline std::uint32_t address_map(T address) {
-    static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-    return address_map_raw(reinterpret_cast<std::uintptr_t>(address));
-  }
+	// Addressing
+	template <typename T = void *> inline std::uint32_t address_map(T address) {
+		static_assert(std::is_pointer_v<T>, "T must be a pointer!");
+		return address_map_raw(reinterpret_cast<std::uintptr_t>(address));
+	}
 
-  template <typename T = void *>
-  inline T address_resolve(std::uint32_t address) {
-    static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-    return reinterpret_cast<T>(address_resolve_raw(address));
-  }
+	template <typename T = void *>
+	inline T address_resolve(std::uint32_t address) {
+		static_assert(std::is_pointer_v<T>, "T must be a pointer!");
+		return reinterpret_cast<T>(address_resolve_raw(address));
+	}
 
-  // armv4.cpp
+	// armv4.cpp
 
-  // NOTE: op2_value is THE final value of operand2, either immediate or shifted
-  // register (paired with op2_* calls)
+	// NOTE: op2_value is THE final value of operand2, either immediate or
+	// shifted register (paired with op2_* calls)
 
-  void arm_add(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_adc(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_sub(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_sbc(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_cmp(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_mov(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_rsb(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_rsc(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_and(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_eor(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_orr(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_bic(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_mvn(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_tst(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_teq(bool s, Register rd, Register rn, reg_value_t op2_value);
-  void arm_cmn(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_add(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_adc(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_sub(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_sbc(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_cmp(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_mov(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_rsb(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_rsc(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_and(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_eor(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_orr(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_bic(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_mvn(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_tst(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_teq(bool s, Register rd, Register rn, reg_value_t op2_value);
+	void arm_cmn(bool s, Register rd, Register rn, reg_value_t op2_value);
 
-  void arm_mul(bool s, Register rd, Register rn, Register rs, Register rm);
-  void arm_mla(bool s, Register rd, Register rn, Register rs, Register rm);
+	void arm_mul(bool s, Register rd, Register rn, Register rs, Register rm);
+	void arm_mla(bool s, Register rd, Register rn, Register rs, Register rm);
 
-  void arm_mull(bool s, bool sign, Register rd_hi, Register rd_lo, Register rs,
-                Register rm);
-  void arm_mlal(bool s, bool sign, Register rd_hi, Register rd_lo, Register rs,
-                Register rm);
+	void arm_mull(bool s, bool sign, Register rd_hi, Register rd_lo,
+	              Register rs, Register rm);
+	void arm_mlal(bool s, bool sign, Register rd_hi, Register rd_lo,
+	              Register rs, Register rm);
 
-  void arm_ldr(bool pre_indx, bool add, bool byte, bool write_back, Register rn,
-               Register rd, reg_value_t offset);
-  void arm_str(bool pre_indx, bool add, bool byte, bool write_back, Register rn,
-               Register rd, reg_value_t offset);
-  void arm_ldm(bool pre_indx, bool add, bool write_back, Register rn,
-               reg_value_t reg_list);
-  void arm_stm(bool pre_indx, bool add, bool write_back, Register rn,
-               reg_value_t reg_list);
-  void arm_ldrh(bool pre_indx, bool add, bool write_back, Register rn,
-                Register rd, uint8_t type, reg_value_t offset);
-  void arm_strh(bool pre_indx, bool add, bool write_back, Register rn,
-                Register rd, uint8_t type, reg_value_t offset);
+	void arm_ldr(bool pre_indx, bool add, bool byte, bool write_back,
+	             Register rn, Register rd, reg_value_t offset);
+	void arm_str(bool pre_indx, bool add, bool byte, bool write_back,
+	             Register rn, Register rd, reg_value_t offset);
+	void arm_ldm(bool pre_indx, bool add, bool write_back, Register rn,
+	             reg_value_t reg_list);
+	void arm_stm(bool pre_indx, bool add, bool write_back, Register rn,
+	             reg_value_t reg_list);
+	void arm_ldrh(bool pre_indx, bool add, bool write_back, Register rn,
+	              Register rd, uint8_t type, reg_value_t offset);
+	void arm_strh(bool pre_indx, bool add, bool write_back, Register rn,
+	              Register rd, uint8_t type, reg_value_t offset);
 
-  // TODO: implement armv5, add thumbv1
+	// TODO: implement armv5, add thumbv1
 
-protected:
-  void *memory_alloc_raw(std::uint32_t size);
+  protected:
+	void *memory_alloc_raw(std::uint32_t size);
 
-  virtual std::uint32_t address_map_raw(std::uintptr_t address);
-  virtual std::uintptr_t address_resolve_raw(std::uint32_t address);
+	virtual std::uint32_t address_map_raw(std::uintptr_t address);
+	virtual std::uintptr_t address_resolve_raw(std::uint32_t address);
 
-private:
-  void memory_init();
+  private:
+	void memory_init();
 
-  std::mutex _memory_lock;
+	std::mutex _memory_lock;
 };
 
 } // namespace layer

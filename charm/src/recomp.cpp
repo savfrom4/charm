@@ -34,7 +34,12 @@ Recompiler::Recompiler(const std::string &elf_exe, bool minify) {
     _reldyn = _elf.sections[".rela.dyn"];
 
   _dynsym = _elf.sections[".dynsym"];
+
+  // initialize (what if called again?)
   _minify = minify;
+  _funs_exports.clear();
+  _funs_reloc.clear();
+  _got_mappings.clear();
 }
 
 void Recompiler::emit(const std::string &output_dir) {

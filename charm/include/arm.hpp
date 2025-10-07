@@ -14,229 +14,229 @@ typedef uint32_t instr_t;
 struct Instruction;
 
 enum class Register : std::uint8_t {
-  R0,
-  R1,
-  R2,
-  R3,
-  R4,
-  R5,
-  R6,
-  R7,
-  R8,
-  R9,
-  R10,
-  R11,
+	R0,
+	R1,
+	R2,
+	R3,
+	R4,
+	R5,
+	R6,
+	R7,
+	R8,
+	R9,
+	R10,
+	R11,
 
-  IP, // r12 / intro-prodecure call
-  SP, // stack pointer
-  LR, // link register
-  PC, // program counter (instr_addr + 8)
+	IP, // r12 / intro-prodecure call
+	SP, // stack pointer
+	LR, // link register
+	PC, // program counter (instr_addr + 8)
 
-  COUNT,
+	COUNT,
 };
 
 enum class Opcode : std::uint8_t {
-  AND, // logical and
-  EOR, // logical exclusive or
-  SUB, // subtract (no carry)
-  RSB, // reverse subtract (no carry)
-  ADD, // add (no carry)
-  ADC, // add (carry)
-  SBC, // subtract (carry)
-  RSC, // reverse subtract (carry)
-  TST, // test bits
-  TEQ, // test eql
-  CMP, // compare
-  CMN, // compare negative
-  ORR, // logical or
-  MOV, // move
-  BIC, // bit clear
-  MVN, // move not
+	AND, // logical and
+	EOR, // logical exclusive or
+	SUB, // subtract (no carry)
+	RSB, // reverse subtract (no carry)
+	ADD, // add (no carry)
+	ADC, // add (carry)
+	SBC, // subtract (carry)
+	RSC, // reverse subtract (carry)
+	TST, // test bits
+	TEQ, // test eql
+	CMP, // compare
+	CMN, // compare negative
+	ORR, // logical or
+	MOV, // move
+	BIC, // bit clear
+	MVN, // move not
 
-  COUNT,
+	COUNT,
 };
 
 enum class Condition : std::uint8_t {
-  EQ, // equal
-  NE, // not equal
-  CS, // carry set
-  CC, // carry clear
-  MI, // negative
-  PL, // positive or zero
-  VS, // overflow set
-  VC, // overflow clear
-  HI, // unsigned higher
-  LS, // unsigned lower or same
-  GE, // signed greater or equal
-  LT, // signed less than
-  GT, // signed greater than
-  LE, // signed less than
-  AL, // always
-  NV, // never
+	EQ, // equal
+	NE, // not equal
+	CS, // carry set
+	CC, // carry clear
+	MI, // negative
+	PL, // positive or zero
+	VS, // overflow set
+	VC, // overflow clear
+	HI, // unsigned higher
+	LS, // unsigned lower or same
+	GE, // signed greater or equal
+	LT, // signed less than
+	GT, // signed greater than
+	LE, // signed less than
+	AL, // always
+	NV, // never
 
-  COUNT,
+	COUNT,
 };
 
 // 4.5.2 Shifts
 struct Shifter {
-  enum {
-    LSL, // logical shift left
-    LSR, // logical shift right
-    ASR, // arithmetic shift right
-    ROR, // rotate right
-  } type;
+	enum {
+		LSL, // logical shift left
+		LSR, // logical shift right
+		ASR, // arithmetic shift right
+		ROR, // rotate right
+	} type;
 
-  bool is_reg;
-  Register rm;               // Rm register to shift.
-  std::uint8_t amount_or_rs; // Shift amount can be stored as an immediate value
-                             // or in a Rs register.
+	bool is_reg;
+	Register rm;               // Rm register to shift.
+	std::uint8_t amount_or_rs; // Shift amount can be stored as an immediate
+	                           // value or in a Rs register.
 
-  static Shifter decode(instr_t value);
+	static Shifter decode(instr_t value);
 };
 
 // 4.5 Data Processing
 struct DataProcessing {
-  Opcode op;
-  Register rn, rd;
+	Opcode op;
+	Register rn, rd;
 
-  union {
-    Shifter op2_reg;
-    uint32_t op2_imm;
-  }; // operand 2
+	union {
+		Shifter op2_reg;
+		uint32_t op2_imm;
+	}; // operand 2
 
-  static DataProcessing decode(Instruction &instr, instr_t value);
+	static DataProcessing decode(Instruction &instr, instr_t value);
 };
 
 // 4.7 Multiply and Multiply-Accumulate (MUL, MLA)
 struct Multiply {
-  bool accumulate;
-  Register rd, rn, rs, rm;
+	bool accumulate;
+	Register rd, rn, rs, rm;
 
-  static Multiply decode(Instruction &instr, instr_t value);
+	static Multiply decode(Instruction &instr, instr_t value);
 };
 
 // 4.8 Multiply Long and Multiply-Accumulate Long (MULL,MLAL)
 struct MultiplyLong {
-  bool sign;             // unsigned (0) or signed (1)
-  bool accumulate;       // accumulate or not
-  Register rd_hi, rd_lo; // low / high register to form a 32 bit value
-  Register rs, rm;
+	bool sign;             // unsigned (0) or signed (1)
+	bool accumulate;       // accumulate or not
+	Register rd_hi, rd_lo; // low / high register to form a 32 bit value
+	Register rs, rm;
 
-  static MultiplyLong decode(Instruction &instr, instr_t value);
+	static MultiplyLong decode(Instruction &instr, instr_t value);
 };
 
 // 4.9 Single Data Transfer (LDR, STR)
 struct DataTransfer {
-  bool pre_indx; // add offset after (0) or before (1) transfer?
-  bool add;      // subtract (0) or add (1) offset from base?
-  bool byte;
-  bool write_back; // write address into base?
-  bool load;       // store (0) or Load (1)?
+	bool pre_indx; // add offset after (0) or before (1) transfer?
+	bool add;      // subtract (0) or add (1) offset from base?
+	bool byte;
+	bool write_back; // write address into base?
+	bool load;       // store (0) or Load (1)?
 
-  Register rn, rd;
+	Register rn, rd;
 
-  union {
-    Shifter offset_reg;
-    uint16_t offset_imm;
-  };
+	union {
+		Shifter offset_reg;
+		uint16_t offset_imm;
+	};
 
-  static DataTransfer decode(Instruction &instr, instr_t value);
+	static DataTransfer decode(Instruction &instr, instr_t value);
 };
 
 // 4.10 Halfword and Signed Data Transfer
 struct HalfWordDataTransfer {
-  bool pre_indx;   // add offset after (0) or before (1) transfer?
-  bool add;        // subtract (0) or add (1) offset from base?
-  bool write_back; // write address into base?
-  bool load;       // store (0) or Load (1)?
+	bool pre_indx;   // add offset after (0) or before (1) transfer?
+	bool add;        // subtract (0) or add (1) offset from base?
+	bool write_back; // write address into base?
+	bool load;       // store (0) or Load (1)?
 
-  Register rn, rd;
+	Register rn, rd;
 
-  enum {
-    SWP = 0b00,              // SWP (decoded seperatley)
-    HALF_WORD = 0b01,        // unsigned half-word
-    SIGNED_BYTE = 0b10,      // signed byte
-    SIGNED_HALF_WORD = 0b11, // signed half-word
-  } type;
+	enum {
+		SWP = 0b00,              // SWP (decoded seperatley)
+		HALF_WORD = 0b01,        // unsigned half-word
+		SIGNED_BYTE = 0b10,      // signed byte
+		SIGNED_HALF_WORD = 0b11, // signed half-word
+	} type;
 
-  union {
-    Register offset_reg;
-    uint8_t offset_imm;
-  };
+	union {
+		Register offset_reg;
+		uint8_t offset_imm;
+	};
 
-  static HalfWordDataTransfer decode(Instruction &instr, instr_t value,
-                                     bool imm);
+	static HalfWordDataTransfer decode(Instruction &instr, instr_t value,
+	                                   bool imm);
 };
 
 // 4.11 Block Data Transfer (LDM, STM)
 struct BlockDataTransfer {
-  bool pre_indx;   // add offset after (0) or before (1) transfer?
-  bool add;        // subtract (0) or add (1) offset from base?
-  bool psr;        // unused for now
-  bool write_back; // write address into base?
-  bool load;       // store (0) or Load (1)?
+	bool pre_indx;   // add offset after (0) or before (1) transfer?
+	bool add;        // subtract (0) or add (1) offset from base?
+	bool psr;        // unused for now
+	bool write_back; // write address into base?
+	bool load;       // store (0) or Load (1)?
 
-  Register rn;
-  uint16_t reg_list;
+	Register rn;
+	uint16_t reg_list;
 
-  static BlockDataTransfer decode(instr_t value);
+	static BlockDataTransfer decode(instr_t value);
 };
 
 // 4.12 Single Data Swap (SWP)
 struct DataSwap {
-  bool byte;
-  Register rn, rd, rm;
+	bool byte;
+	Register rn, rd, rm;
 
-  static DataSwap decode(instr_t value);
+	static DataSwap decode(instr_t value);
 };
 
 // 4.4 Branch and Branch with Link (B, BL)
 struct Branch {
-  bool link;           // write address to link register?
-  std::int32_t offset; // NOTE: signed offset
+	bool link;           // write address to link register?
+	std::int32_t offset; // NOTE: signed offset
 
-  static Branch decode(instr_t value);
+	static Branch decode(instr_t value);
 };
 
 // 4.3 Branch and Exchange (BX)
 struct BranchEx {
-  Register rm;
+	Register rm;
 
-  static BranchEx decode(instr_t value);
+	static BranchEx decode(instr_t value);
 };
 
 // 4.13 Software Interrupt (SWI)
 struct SWI {
-  static SWI decode(instr_t value);
+	static SWI decode(instr_t value);
 };
 
 enum class InstructionGroup {
-  DATA_PROCESSING,
-  MULTIPLY,
-  MULTIPLY_LONG,
-  DATA_TRANSFER,
-  HALFWORD_DATA_TRANSFER,
-  BLOCK_DATA_TRANSFER,
-  DATA_SWAP,
-  BRANCH,
-  BRANCH_EXCHANGE,
-  SWI,
+	DATA_PROCESSING,
+	MULTIPLY,
+	MULTIPLY_LONG,
+	DATA_TRANSFER,
+	HALFWORD_DATA_TRANSFER,
+	BLOCK_DATA_TRANSFER,
+	DATA_SWAP,
+	BRANCH,
+	BRANCH_EXCHANGE,
+	SWI,
 };
 
 struct Instruction {
-  instr_t value = 0xFFFFFFFF; // raw representation of the instruction
-  Condition condition = Condition::AL;
-  bool immediate;  // is operand imm or reg?
-  bool set_cflags; // will set condition flags?
+	instr_t value = 0xFFFFFFFF; // raw representation of the instruction
+	Condition condition = Condition::AL;
+	bool immediate;  // is operand imm or reg?
+	bool set_cflags; // will set condition flags?
 
-  std::variant<DataProcessing, Multiply, MultiplyLong, DataTransfer,
-               HalfWordDataTransfer, BlockDataTransfer, DataSwap, Branch,
-               BranchEx, SWI>
-      group;
+	std::variant<DataProcessing, Multiply, MultiplyLong, DataTransfer,
+	             HalfWordDataTransfer, BlockDataTransfer, DataSwap, Branch,
+	             BranchEx, SWI>
+	    group;
 
-  static Instruction decode(instr_t value);
+	static Instruction decode(instr_t value);
 
-  std::string dump() const;
+	std::string dump() const;
 };
 
 } // namespace charm::arm

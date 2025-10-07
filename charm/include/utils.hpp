@@ -16,6 +16,7 @@ inline std::string sformat(const std::string &fmt, Args... args) {
   buffer.resize(length + 1);
   std::snprintf(buffer.data(), buffer.size(), fmt.c_str(),
                 cstr(std::forward<Args>(args))...);
+  buffer.resize(length);
 
   return buffer;
 }

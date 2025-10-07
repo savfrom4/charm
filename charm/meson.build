@@ -1,3 +1,5 @@
+subdir('templates')
+
 executable(
   'charm',
 

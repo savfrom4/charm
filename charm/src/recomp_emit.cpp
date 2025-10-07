@@ -1,5 +1,7 @@
 #include "arm.hpp"
 #include "recomp.hpp"
+#include "template.hpp"
+#include "utils.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -13,505 +15,400 @@
 namespace charm::recomp {
 
 void Recompiler::step_emit(const std::string &output_dir) {
-  const auto liblayer_path =
-      std::filesystem::current_path() / "deps" / "liblayer";
-  const auto symlink_path = std::filesystem::path{output_dir} / "liblayer";
+	static const auto liblayer_path =
+	    std::filesystem::current_path() / "liblayer";
 
-  if (!std::filesystem::exists(liblayer_path)) {
-    throw std::runtime_error(
-        "Copy or symlink the \"liblayer\" directory from source "
-        "to \"deps\" directory in current working direction.");
-  }
+	static const auto symlink_path =
+	    std::filesystem::path{output_dir} / "liblayer";
 
-  std::filesystem::create_directory(output_dir);
+	if (!std::filesystem::exists(liblayer_path)) {
+		throw std::runtime_error(
+		    "Recompiler::step_emit: Copy or symlink the \"liblayer\" directory "
+		    "from source "
+		    "to cwd!.");
+	}
 
-  if (!std::filesystem::exists(symlink_path)) {
-    std::filesystem::create_symlink(liblayer_path, symlink_path);
-  }
+	std::filesystem::create_directory(output_dir);
 
-  emit_meson_options(output_dir);
-  emit_meson_project(output_dir);
+	if (!std::filesystem::exists(symlink_path)) {
+		std::filesystem::create_symlink(liblayer_path, symlink_path);
+	}
 
-  std::cout << "> Code ..." << std::endl;
-  emit_code_header(output_dir);
-  emit_code_source(output_dir);
+	emit_meson_options(output_dir);
+	emit_meson_project(output_dir);
 
-  std::cout << "> Data ..." << std::endl;
-  emit_data_header(output_dir);
-  emit_data_source(output_dir);
+	std::cout << "> Code ..." << std::endl;
+	emit_code_header(output_dir);
+	emit_code_source(output_dir);
+
+	std::cout << "> Data ..." << std::endl;
+	emit_data_header(output_dir);
+	emit_data_source(output_dir);
 }
 
 void Recompiler::emit_meson_options(const std::string &output_dir) {
-  auto meson_options_path = std::filesystem::path{
-      std::filesystem::path{output_dir} / "meson_options.txt"};
+	const auto meson_options_path = std::filesystem::path{
+	    std::filesystem::path{output_dir} / "meson_options.txt"};
 
-  if (std::filesystem::exists(meson_options_path)) {
-    return;
-  }
+	if (std::filesystem::exists(meson_options_path)) {
+		return;
+	}
 
-  std::ofstream ofs{meson_options_path};
-  ofs << "option('debugging', type: 'boolean', value: false, "
-         "description: "
-         "'Enable debugging via charm-dbg')"
-      << std::endl;
-  ofs << "option('library', type: 'boolean', value: true, description: "
-         "'Build as library')"
-      << std::endl;
+	std::ofstream ofs{meson_options_path};
+	ofs << "option('debugging', type: 'boolean', value: false, "
+	       "description: "
+	       "'Enable debugging via charm-dbg')"
+	    << std::endl;
+
+	ofs << "option('library', type: 'boolean', value: true, description: "
+	       "'Build as library')"
+	    << std::endl;
 }
 
 void Recompiler::emit_meson_project(const std::string &output_dir) {
-  auto meson_project_path =
-      std::filesystem::path{std::filesystem::path{output_dir} / "meson.build"};
+	const auto meson_project_path = std::filesystem::path{
+	    std::filesystem::path{output_dir} / "meson.build"};
 
-  if (std::filesystem::exists(meson_project_path)) {
-    return;
-  }
+	if (std::filesystem::exists(meson_project_path)) {
+		return;
+	}
 
-  std::ofstream ofs{meson_project_path};
-  ofs << "project('output', 'cpp', default_options: [ 'b_lto=true' ])"
-      << std::endl
-      << std::endl;
-  ofs << "subdir('liblayer')" << std::endl << std::endl;
-
-  ofs << "sources = files('code.cpp', 'data.cpp')" << std::endl << std::endl;
-
-  ofs << "if get_option('debugging')" << std::endl;
-  ofs << "\tadd_project_arguments('-DLAYER_DEBUG', language : 'cpp')"
-      << std::endl;
-  ofs << "endif" << std::endl;
-
-  ofs << "add_project_arguments('-Wno-unused-label', language : 'cpp')"
-      << std::endl
-      << std::endl;
-
-  ofs << "if get_option('library')" << std::endl;
-  ofs << "\toutput_dep = library('output', include_directories: "
-         "[ '.' ], sources: "
-         "sources, dependencies: [liblayer_dep])"
-      << std::endl;
-  ofs << "else" << std::endl;
-  ofs << "\toutput_dep = executable('output', include_directories: "
-         "[ '.' ], sources: "
-         "sources, dependencies: [liblayer_dep])"
-      << std::endl;
-  ofs << "endif" << std::endl;
+	std::ofstream ofs;
+	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+	ofs.open(meson_project_path);
+	ofs << Template("templates/template.meson.build").str();
 }
 
 void Recompiler::emit_code_header(const std::string &output_dir) {
-  std::ofstream ofs{
-      std::filesystem::path{std::filesystem::path{output_dir} / "code.hpp"},
-  };
+	const auto code_hpp_path =
+	    std::filesystem::path{std::filesystem::path{output_dir} / "code.hpp"};
 
-  ofs << "#pragma once" << std::endl;
-  ofs << "#include <liblayer/liblayer.hpp>" << std::endl;
-  ofs << "#define INSTR_RETURN_LR (0xFFFFFFFF)" << std::endl << std::endl;
+	std::ofstream ofs;
+	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+	ofs.open(code_hpp_path);
 
-  ofs << "class ProgramState : public layer::ExecutionState {" << std::endl;
-  ofs << "public:" << std::endl;
-  ofs << "\tstd::uint32_t address_map_raw(std::uintptr_t addr) override;"
-      << std::endl;
-  ofs << "\tstd::uintptr_t address_resolve_raw(std::uint32_t addr) override;"
-      << std::endl;
-  ofs << "};" << std::endl << std::endl;
+	Template tl{"templates/template.code.hpp"};
 
-  ofs << "void eval(ProgramState& ps, std::uint32_t address);" << std::endl
-      << std::endl;
+	// emit exported functions
+	tl.format("exported_functions", [&](std::stringstream &ss) {
+		for (auto &functions : _funs_exports) {
+			ss << utils::sformat("\tvoid export_%s();",
+			                     symbol_name_map(functions.second.name))
+			   << std::endl;
+		}
+	});
 
-  ofs << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl << std::endl;
+	tl.format("external_functions", [&](std::stringstream &ss) {
+		for (auto &functions : _funs_reloc) {
+			if (!functions.second.is_external) {
+				continue;
+			}
 
-  for (auto &functions : _funs_exports) {
-    ofs << "void export_" << symbol_name_map(functions.second.name)
-        << "(ProgramState& ps);" << std::endl;
-  }
+			ss << utils::sformat("\tvoid external_%s();",
+			                     symbol_name_map(functions.second.name))
+			   << std::endl;
+		}
+	});
 
-  ofs << std::endl
-      << MINIFY_COMMENT("/* EXTERNAL DEPENDENCIES */") << std::endl
-      << std::endl;
-
-  for (auto &functions : _funs_reloc) {
-    if (!functions.second.is_external) {
-      continue;
-    }
-
-    ofs << "void external_" << symbol_name_map(functions.second.name)
-        << "(ProgramState& ps);" << std::endl;
-  }
-
-  ofs << std::endl;
+	ofs << tl.str();
 }
 
 void Recompiler::emit_code_source(const std::string &output_dir) {
-  std::ofstream ofs{
-      std::filesystem::path{std::filesystem::path{output_dir} / "code.cpp"},
-  };
+	const auto code_cpp_path =
+	    std::filesystem::path{std::filesystem::path{output_dir} / "code.cpp"};
 
-  ofs << "#define LAYER_IMPLEMENTATION" << std::endl;
-  ofs << "#include <iostream>" << std::endl;
-  ofs << "#include <stdexcept>" << std::endl;
-  ofs << "#include <string>" << std::endl;
-  ofs << "#include <liblayer/liblayer.hpp>" << std::endl;
-  ofs << "#include \"code.hpp\"" << std::endl;
-  ofs << "#include \"data.hpp\"" << std::endl << std::endl;
-  ofs << "#define INSTR(ADDR) case ADDR: a##ADDR: ps.r[PC] = ADDR+8;"
-      << std::endl;
-  ofs << "#define JUMP(ADDR) address = ADDR;  goto __start__;" << std::endl;
-  ofs << "#define EXPORT(name, address) __attribute__((weak)) void "
-         "name (ProgramState& ps) { LAYER_DBE_SKIP(ps, \"%s\", \"call: \" "
-         "#name); "
-         "ps.r[LR] = INSTR_RETURN_LR; "
-         "eval(ps, address); }"
-      << std::endl;
-  ofs << "#define STUB(name) __attribute__((weak)) void "
-         "name (ProgramState& ps) { LAYER_DBE_LOG(ps, \"%s\", \"unimplemented "
-         "stub: \" #name); }"
-      << std::endl;
-  ofs << "using namespace layer;" << std::endl;
+	std::ofstream ofs;
+	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+	ofs.open(code_cpp_path);
 
-  ofs << std::endl
-      << MINIFY_COMMENT("/* ADDRESS MAPPING */") << std::endl
-      << std::endl;
+	Template tl{"templates/template.code.cpp"};
 
-  emit_code_address_mappings(ofs);
-  emit_code_stubs(ofs);
+	tl.format("got_mappings", [&](std::stringstream &ss) {
+		for (auto &functions : _funs_reloc) {
+			if (!functions.second.is_external) {
+				continue;
+			}
 
-  ofs << "void eval(ProgramState& ps, std::uint32_t address) {" << std::endl;
-  ofs << "__start__:" << std::endl;
-  ofs << "\tswitch(address) {" << std::endl;
+			ss << utils::sformat("INSTR(0x%X) { external_%s(); address = "
+			                     "ps.r[LR]; goto "
+			                     "__start__; }",
+			                     functions.second.address,
+			                     symbol_name_map(functions.second.name))
+			   << std::endl;
+		}
+	});
 
-  ofs << MINIFY_COMMENT(
-             "\t// this is a special address that is used to return out of "
-             "function when PC is set it.")
-      << std::endl;
+	tl.format("sections", [&](std::stringstream &ss) {
+		for (auto &section : _elf.sections) {
+			if (!section_is_code(section.get())) {
+				continue;
+			}
 
-  ofs << "\tINSTR(INSTR_RETURN_LR) {" << std::endl;
-  ofs << "\t\treturn;" << std::endl;
-  ofs << "\t}" << std::endl << std::endl;
+			emit_code_section(ss, section.get());
+		}
+	});
 
-  ofs << MINIFY_COMMENT(
-             "\t// mapping external functions to their .got addresses")
-      << std::endl;
+	emit_code_address_mappings(tl);
+	emit_code_stubs(tl);
 
-  ofs << std::hex;
-  for (auto &functions : _funs_reloc) {
-    if (!functions.second.is_external) {
-      continue;
-    }
-
-    ofs << "\tINSTR(0x" << functions.second.address << ") {" << std::endl;
-    ofs << "\t\texternal_" << symbol_name_map(functions.second.name) << "(ps);"
-        << std::endl;
-    ofs << "\t\taddress = ps.r[LR]; goto __start__;" << std::endl;
-    ofs << "\t}" << std::endl << std::endl;
-  }
-  ofs << std::dec;
-
-  for (auto &section : _elf.sections) {
-    if (!section_is_code(section.get())) {
-      continue;
-    }
-
-    emit_code_section(ofs, section.get());
-  }
-
-  ofs << "\tdefault:" << std::endl;
-
-  if (_minify) {
-    ofs << "\t\t__builtin_unreachable();";
-  } else {
-    ofs << "\t\tthrow std::runtime_error(\"Invalid address: \" + "
-           "std::to_string(address));";
-  }
-
-  ofs << std::endl << "\t}" << std::endl << "}" << std::endl;
+	ofs << tl.str();
 }
 
 void Recompiler::emit_data_header(const std::string &output_dir) {
-  std::ofstream ofs{
-      std::filesystem::path{std::filesystem::path{output_dir} / "data.hpp"},
-  };
+	const auto code_hpp_path =
+	    std::filesystem::path{std::filesystem::path{output_dir} / "data.hpp"};
 
-  ofs << "/* THIS FILE IS AUTO-GENERATED BY charm STATIC "
-         "RECOMPILER! DO NOT "
-         "MODIFY DIRECTLY! */"
-      << std::endl;
+	std::ofstream ofs;
+	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+	ofs.open(code_hpp_path);
 
-  ofs << "#pragma once" << std::endl;
-  ofs << "#include <array>" << std::endl;
-  ofs << "#include <cstdint>" << std::endl << std::endl;
+	ofs << "#pragma once" << std::endl;
+	ofs << "#include <array>" << std::endl;
+	ofs << "#include <cstdint>" << std::endl << std::endl;
 
-  for (auto &section : _elf.sections) {
-    if (!section_is_data(section.get())) {
-      continue;
-    }
+	for (auto &section : _elf.sections) {
+		if (!section_is_data(section.get())) {
+			continue;
+		}
 
-    auto name = symbol_name_map(section->get_name());
-    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+		auto name = symbol_name_map(section->get_name());
+		std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-    auto data_type = "std::uint8_t";
-    auto data_size = section->get_size();
+		auto data_type = "std::uint8_t";
+		auto data_size = section->get_size();
 
-    // for .got entries, we actually store words
-    if (section->get_name().find(".got") != std::string::npos) {
-      data_type = "std::uint32_t";
-      data_size /= sizeof(uint32_t);
-    }
+		// for .got entries, we actually store words
+		if (section->get_name().find(".got") != std::string::npos) {
+			data_type = "std::uint32_t";
+			data_size /= sizeof(uint32_t);
+		}
 
-    ofs << ((section->get_flags() & ELFIO::SHF_WRITE) ? "extern"
-                                                      : "extern const")
-        << " std::array<" << data_type << ", " << data_size << "> g_" << name
-        << "_DATA;" << std::endl;
+		ofs << ((section->get_flags() & ELFIO::SHF_WRITE) ? "extern"
+		                                                  : "extern const")
+		    << " std::array<" << data_type << ", " << data_size << "> g_"
+		    << name << "_DATA;" << std::endl;
 
-    ofs << "inline constexpr std::uint32_t " << name << "_ADDR = 0x" << std::hex
-        << section->get_address() << std::dec << "; /* Virtual address of "
-        << section->get_name() << " */" << std::endl
-        << std::endl;
-  }
+		ofs << "inline constexpr std::uint32_t " << name << "_ADDR = 0x"
+		    << std::hex << section->get_address() << std::dec
+		    << "; /* Virtual address of " << section->get_name() << " */"
+		    << std::endl
+		    << std::endl;
+	}
 }
 
 void Recompiler::emit_data_source(const std::string &output_dir) {
-  std::ofstream ofs{
-      std::filesystem::path{std::filesystem::path{output_dir} / "data.cpp"},
-  };
+	const auto code_hpp_path =
+	    std::filesystem::path{std::filesystem::path{output_dir} / "data.cpp"};
 
-  ofs << "/* THIS FILE IS AUTO-GENERATED BY charm STATIC "
-         "RECOMPILER! DO NOT "
-         "MODIFY DIRECTLY! */"
-      << std::endl;
+	std::ofstream ofs;
+	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+	ofs.open(code_hpp_path);
 
-  ofs << "#include \"data.hpp\"" << std::endl << std::endl;
+	ofs << "#include \"data.hpp\"" << std::endl << std::endl;
 
-  for (auto &section : _elf.sections) {
-    if (!section_is_data(section.get())) {
-      continue;
-    }
+	for (auto &section : _elf.sections) {
+		if (!section_is_data(section.get())) {
+			continue;
+		}
 
-    const std::uint8_t *data =
-        reinterpret_cast<const std::uint8_t *>(section->get_data());
+		const std::uint8_t *data =
+		    reinterpret_cast<const std::uint8_t *>(section->get_data());
 
-    auto name = symbol_name_map(section->get_name());
-    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+		auto name = symbol_name_map(section->get_name());
+		std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-    std::stringstream ss;
+		std::stringstream ss;
 
-    // for non-got table we just write raw bytes or 0es
-    if (section->get_name().find(".got") == std::string::npos) {
-      ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-                  ? "std::array<std::uint8_t, "
-                  : "const std::array<std::uint8_t, ")
-          << section->get_size() << "> g_" << name << "_DATA = {" << std::endl;
+		// for non-got table we just write raw bytes or 0es
+		if (section->get_name().find(".got") == std::string::npos) {
+			ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
+			            ? "std::array<std::uint8_t, "
+			            : "const std::array<std::uint8_t, ")
+			    << section->get_size() << "> g_" << name << "_DATA = {"
+			    << std::endl;
 
-      ss << "\t";
-      for (charm::arm::addr_t i = 0; i < section->get_size(); i++) {
-        ss << (data ? static_cast<int>(data[i]) : 0) << ", ";
+			ss << "\t";
+			for (charm::arm::addr_t i = 0; i < section->get_size(); i++) {
+				ss << (data ? static_cast<int>(data[i]) : 0) << ", ";
 
-        if (i % 8 == 7) {
-          ss << std::endl;
-          ss << "\t";
-        }
-      }
-    } else { // for got we map addresses that we know
-      ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-                  ? "std::array<std::uint32_t, "
-                  : "const std::array<std::uint32_t, ")
-          << section->get_size() / sizeof(std::uint32_t) << "> g_" << name
-          << "_DATA = {" << std::endl;
+				if (i % 8 == 7) {
+					ss << std::endl;
+					ss << "\t";
+				}
+			}
+		} else { // for got we map addresses that we know
+			ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
+			            ? "std::array<std::uint32_t, "
+			            : "const std::array<std::uint32_t, ")
+			    << section->get_size() / sizeof(std::uint32_t) << "> g_" << name
+			    << "_DATA = {" << std::endl;
 
-      ss << std::hex;
+			ss << std::hex;
 
-      // map addresses
-      for (arm::addr_t i = 0; i < section->get_size();
-           i += sizeof(arm::instr_t)) {
-        arm::addr_t mapped_address = 0;
+			// map addresses
+			for (arm::addr_t i = 0; i < section->get_size();
+			     i += sizeof(arm::instr_t)) {
+				arm::addr_t mapped_address = 0;
 
-        for (auto &mapping : _got_mappings) {
-          arm::addr_t offset = std::get<0>(mapping) - section->get_address();
-          if (offset != i) {
-            continue;
-          }
+				for (auto &mapping : _got_mappings) {
+					arm::addr_t offset =
+					    std::get<0>(mapping) - section->get_address();
+					if (offset != i) {
+						continue;
+					}
 
-          mapped_address = std::get<1>(mapping);
-          break;
-        }
+					mapped_address = std::get<1>(mapping);
+					break;
+				}
 
-        ss << "\t0x" << mapped_address << "," << std::endl;
-      }
+				ss << "\t0x" << mapped_address << "," << std::endl;
+			}
 
-      ss << std::dec;
-    }
+			ss << std::dec;
+		}
 
-    ofs << ss.rdbuf() << std::endl << "};" << std::endl;
-  }
+		ofs << ss.rdbuf() << std::endl << "};" << std::endl;
+	}
 }
 
-void Recompiler::emit_code_address_mappings(std::ofstream &ofs) {
-  ofs << "inline std::uint32_t ProgramState::address_map_raw(std::uintptr_t "
-         "addr) {"
-      << std::endl;
+void Recompiler::emit_code_address_mappings(Template &tl) {
+	tl.format("address_map", [&](std::stringstream &ss) {
+		for (auto &section : _elf.sections) {
+			if (!section_is_data(section.get())) {
+				continue;
+			}
 
-  ofs << std::hex;
+			auto name = symbol_name_map(section->get_name());
+			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-  ofs << "\tstd::uint32_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::address_map_raw(addr))) { return "
-         "mapped; }"
-      << std::endl
-      << std::endl;
+			ss << utils::sformat(
+			          "\tif(address >= "
+			          "reinterpret_cast<std::uintptr_t>(g_%s_DATA.data()) && "
+			          "address < "
+			          "reinterpret_cast<std::uintptr_t>(g_%s_DATA.data()) + "
+			          "sizeof(g_%s_DATA)) {",
+			          name, name, name)
+			   << std::endl;
 
-  for (auto &section : _elf.sections) {
-    if (!section_is_data(section.get())) {
-      continue;
-    }
+			ss << utils::sformat(
+			          "\t\treturn 0x%X + static_cast<uint32_t>(address - "
+			          "reinterpret_cast<uintptr_t>(g_%s_DATA.data()));",
+			          section->get_address(), name)
+			   << std::endl;
 
-    auto name = symbol_name_map(section->get_name());
-    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+			ss << "\t}" << std::endl;
+		}
+	});
 
-    ofs << "\tif(addr >= reinterpret_cast<std::uintptr_t>(g_" << name
-        << "_DATA.data())"
-        << " && addr < reinterpret_cast<std::uintptr_t>(g_" << name
-        << "_DATA.data()) + sizeof(g_" << name << "_DATA)) {" << std::endl;
+	tl.format("address_resolve", [&](std::stringstream &ss) {
+		for (auto &section : _elf.sections) {
+			if (!section_is_data(section.get())) {
+				continue;
+			}
 
-    ofs << "\t\treturn 0x" << (uint32_t)section->get_address()
-        << " + static_cast<uint32_t>("
-        << "addr - reinterpret_cast<uintptr_t>(g_" << name << "_DATA.data()));"
-        << std::endl;
+			auto name = symbol_name_map(section->get_name());
+			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-    ofs << "\t}" << std::endl;
-  }
+			ss << utils::sformat("\tif(address >= 0x%X && address < 0x%X) {",
+			                     section->get_address(),
+			                     section->get_address() + section->get_size())
+			   << std::endl;
 
-  ofs << std::endl;
-  ofs << "\tLAYER_DBE_LOG(*this, \"Error: unable to map address: 0x%X!\", "
-         "addr);"
-      << std::endl;
-  ofs << "\tLAYER_DBE_SEND_PAUSED(*this);" << std::endl;
-  ofs << "\tthrow std::runtime_error(\"address_map: unable to map "
-         "address!\");"
-      << std::endl;
+			ss << utils::sformat("\t\treturn "
+			                     "reinterpret_cast<std::uintptr_t>(&"
+			                     "reinterpret_cast<const "
+			                     "char*>(g_%s_DATA.data())[address - 0x%X]);",
+			                     name, section->get_address())
+			   << std::endl;
 
-  ofs << "}" << std::endl << std::endl;
-
-  ofs << "inline std::uintptr_t "
-         "ProgramState::address_resolve_raw(std::uint32_t "
-         "addr) {"
-      << std::endl;
-
-  ofs << "\tstd::uintptr_t mapped;" << std::endl;
-  ofs << "\tif((mapped = ExecutionState::address_resolve_raw(addr))) { return "
-         "mapped; }"
-      << std::endl
-      << std::endl;
-
-  for (auto &section : _elf.sections) {
-    if (!section_is_data(section.get())) {
-      continue;
-    }
-
-    auto name = symbol_name_map(section->get_name());
-    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
-
-    ofs << "\tif(addr >= 0x" << section->get_address() << " && addr < 0x"
-        << section->get_address() + section->get_size() << ") {" << std::endl;
-
-    ofs << "\t\treturn "
-           "reinterpret_cast<std::uintptr_t>(&reinterpret_cast<const "
-           "char*>(g_"
-        << name << "_DATA.data())[addr - 0x" << section->get_address() << "]);"
-        << std::endl;
-
-    ofs << "\t}" << std::endl;
-  }
-
-  ofs << std::endl;
-  ofs << "\tLAYER_DBE_LOG(*this, \"Error: unable to resolve address: 0x%X!\", "
-         "addr);"
-      << std::endl;
-  ofs << "\tLAYER_DBE_SEND_PAUSED(*this);" << std::endl;
-  ofs << "\tthrow std::runtime_error(\"address_resolve: unable to resolve "
-         "address!\");"
-      << std::endl;
-
-  ofs << std::dec;
-  ofs << "}" << std::endl << std::endl;
+			ss << "\t}" << std::endl;
+		}
+	});
 }
 
-void Recompiler::emit_code_stubs(std::ofstream &ofs) {
-  ofs << std::endl
-      << MINIFY_COMMENT("/* EXPORTED FUNCTIONS */") << std::endl
-      << std::endl;
+void Recompiler::emit_code_stubs(Template &tl) {
+	tl.format("exported_functions", [&](std::stringstream &ss) {
+		for (auto &functions : _funs_exports) {
+			ss << utils::sformat("EXPORT(export_%s, 0x%X);",
+			                     symbol_name_map(functions.second.name),
+			                     functions.second.address)
+			   << std::endl;
+		}
+	});
 
-  ofs << std::hex;
-  for (auto &functions : _funs_exports) {
-    ofs << "EXPORT(export_" << symbol_name_map(functions.second.name) << ", 0x"
-        << functions.second.address << ");" << std::endl;
-  }
-  ofs << std::dec;
+	tl.format("external_functions", [&](std::stringstream &ss) {
+		for (auto &functions : _funs_reloc) {
+			if (!functions.second.is_external) {
+				continue;
+			}
 
-  ofs << std::endl
-      << MINIFY_COMMENT("/* EXTERNAL DEPENDENCIES */") << std::endl
-      << std::endl;
-
-  for (auto &functions : _funs_reloc) {
-    if (!functions.second.is_external) {
-      continue;
-    }
-
-    ofs << "STUB(external_" << symbol_name_map(functions.second.name) << ");"
-        << std::endl;
-  }
-
-  ofs << std::endl;
+			ss << utils::sformat("STUB(external_%s);",
+			                     symbol_name_map(functions.second.name))
+			   << std::endl;
+		}
+	});
 }
 
 std::string Recompiler::symbol_name_map(const std::string &symbol) {
-  std::string s;
+	std::string s;
 
-  for (auto &ch : symbol) {
-    if (isspace(ch)) {
-      s += '_';
-      continue;
-    }
+	for (auto &ch : symbol) {
+		if (isspace(ch)) {
+			s += '_';
+			continue;
+		}
 
-    if (!isalpha(ch) && !isdigit(ch) && ch != '_') {
-      continue;
-    }
+		if (!isalpha(ch) && !isdigit(ch) && ch != '_') {
+			continue;
+		}
 
-    s += ch;
-  }
+		s += ch;
+	}
 
-  return s;
+	return s;
 }
 
 bool Recompiler::section_is_data(const ELFIO::section *section) {
-  auto flags = section->get_flags();
-  if (!(flags & ELFIO::SHF_ALLOC) && !(flags & ELFIO::SHF_EXECINSTR)) {
-    return false;
-  }
+	if (!section) {
+		return false;
+	}
 
-  auto type = section->get_type();
-  if (type == ELFIO::SHT_SYMTAB || type == ELFIO::SHT_DYNSYM ||
-      type == ELFIO::SHT_RELA) {
-    return false;
-  }
+	auto flags = section->get_flags();
+	if (!(flags & ELFIO::SHF_ALLOC) && !(flags & ELFIO::SHF_EXECINSTR)) {
+		return false;
+	}
 
-  if (section->get_name().find("padding") != std::string::npos) {
-    return false;
-  }
+	auto type = section->get_type();
+	if (type == ELFIO::SHT_SYMTAB || type == ELFIO::SHT_DYNSYM ||
+	    type == ELFIO::SHT_RELA) {
+		return false;
+	}
 
-  if (!section->get_size()) {
-    return false;
-  }
+	if (section->get_name().find("padding") != std::string::npos) {
+		return false;
+	}
 
-  return true;
+	if (!section->get_size()) {
+		return false;
+	}
+
+	return true;
 }
 
 bool Recompiler::section_is_code(const ELFIO::section *section) {
-  if (!(section->get_flags() & ELFIO::SHF_EXECINSTR)) {
-    return false;
-  }
+	if (!section) {
+		return false;
+	}
 
-  if (!section->get_data()) {
-    return false;
-  }
+	if (!(section->get_flags() & ELFIO::SHF_EXECINSTR)) {
+		return false;
+	}
 
-  return true;
+	if (!section->get_data()) {
+		return false;
+	}
+
+	return true;
 }
 
 } // namespace charm::recomp
