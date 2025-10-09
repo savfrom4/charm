@@ -462,7 +462,7 @@ std::string Instruction::dump() const {
 
 		if (immediate) {
 			//, #imm
-			ss << utils::sformat(", #%s" PRIu8, hw_data_trans.add ? "" : "-",
+			ss << utils::sformat(", #%s%" PRIu8, hw_data_trans.add ? "" : "-",
 			                     hw_data_trans.offset_imm);
 		} else {
 			//, reg

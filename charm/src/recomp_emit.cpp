@@ -129,9 +129,7 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
 				continue;
 			}
 
-			ss << utils::sformat("INSTR(0x%X) { external_%s(); address = "
-			                     "ps.r[LR]; goto "
-			                     "__start__; }",
+			ss << utils::sformat("INSTR(0x%X) { external_%s(); JUMP(r[LR]); }",
 			                     functions.second.address,
 			                     symbol_name_map(functions.second.name))
 			   << std::endl;

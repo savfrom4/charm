@@ -63,24 +63,21 @@ class Template {
 	}
 
 	template <typename... Args>
-	inline Template &format(const std::string &token,
-	                        std::function<void(std::stringstream &)> cb) {
+	inline void format(const std::string &token,
+	                   std::function<void(std::stringstream &)> cb) {
 		std::stringstream ss;
 		cb(ss);
 
 		format(token, ss.str());
-		return *this;
 	}
 
 	template <typename... Args>
-	inline Template &format(const std::string &token, const std::string &fmt,
-	                        Args... args) {
+	inline void format(const std::string &token, const std::string &fmt,
+	                   Args... args) {
 		format(token, utils::sformat(fmt, args...));
-		return *this;
 	}
 
-	inline Template &format(const std::string &token,
-	                        const std::string &value) {
+	inline void format(const std::string &token, const std::string &value) {
 		// search for the token
 		const auto it = _tokens.find(token);
 		if (it == _tokens.end()) {
@@ -102,7 +99,6 @@ class Template {
 		}
 
 		_tokens.erase(it);
-		return *this;
 	}
 
 	const std::string &str() const { return _contents; }

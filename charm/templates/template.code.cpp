@@ -16,6 +16,7 @@ using namespace layer;
 
 #define STUB(name)                                                             \
 	__attribute__((weak)) void ProgramState::name() {                          \
+		std::cout << "stub: " << #name << std::endl;                           \
 		LAYER_DBE_LOG(*this, "stub: %s", #name);                               \
 	}
 

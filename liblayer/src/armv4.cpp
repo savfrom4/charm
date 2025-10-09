@@ -480,18 +480,18 @@ void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
 		LAYER_DBE_SEND_PAUSED(*this);
 		throw std::runtime_error("arm_ldrh: SWP is not implemented!");
 
-	case 0b01: // LDRHR
+	case 0b01: // LDRH
 		r[rd] = 0;
 		memcpy(&r[rd], mem, sizeof(uint16_t));
 		break;
 
-	case 0b10: // LDRSBR
+	case 0b10: // LDRSB
 		int8_t byte;
 		memcpy(&byte, mem, sizeof(int8_t));
 		r[rd] = static_cast<reg_value_t>(static_cast<int32_t>(byte));
 		break;
 
-	case 0b11: // LDRSHR
+	case 0b11: // LDRSH
 		int16_t word;
 		memcpy(&word, mem, sizeof(int16_t));
 		r[rd] = static_cast<reg_value_t>(static_cast<int32_t>(word));
@@ -554,20 +554,15 @@ void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
 	value = BESWAP32(value);
 
 	switch (type) {
-	case 0b00:
-		LAYER_DBE_LOG(*this, "%s", "error: SWP is not implemented!");
-		LAYER_DBE_SEND_PAUSED(*this);
-		throw std::runtime_error("arm_strh: SWP is not implemented!");
-
-	case 0b01: // STRHR
+	case 0b01: // STRH
 		memcpy(mem, &value, sizeof(uint16_t));
 		break;
 
-	case 0b10: // STRSBR
+	case 0b10: // STRSB
 		memcpy(mem, &value, sizeof(int8_t));
 		break;
 
-	case 0b11: // STRSHR
+	case 0b11: // STRSH
 		memcpy(mem, &value, sizeof(int16_t));
 		break;
 	}

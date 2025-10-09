@@ -371,11 +371,9 @@ void Recompiler::emit_arm_halfword_data_transfer(std::ostream &os,
 		os << "0x" << (int)hw_data_trans.offset_imm
 		   << MINIFY_COMMENT(" /* offset */");
 	} else {
-		os << REGISTER_TABLE[(int)hw_data_trans.offset_reg]
+		os << "r[" << REGISTER_TABLE[(int)hw_data_trans.offset_reg] << "]"
 		   << MINIFY_COMMENT(" /* rm */");
 	}
-
-	// TODO: fix this
 
 	os << std::dec << ");";
 }
