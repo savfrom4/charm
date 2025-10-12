@@ -15,7 +15,6 @@
 #include <unistd.h>
 #include <vector>
 
-// NOTE: see .cpp file for sizes
 enum class DebugCommand : std::uint8_t {
 	NONE,
 	BREAK,            // set/remove breakpoint

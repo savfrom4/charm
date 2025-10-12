@@ -2,6 +2,10 @@
 #include "recomp.hpp"
 #include <sstream>
 
+// to automatically exclude comments
+#define MINIFY_COMMENT(x) (_minify ? "" : x)
+#define MINIFY_COMMENT_COMMA(x) (_minify ? "," : x)
+
 const std::array<std::string, (int)charm::arm::Opcode::COUNT> OPCODE_TABLE = {
     "arm_and", "arm_eor", "arm_sub", "arm_rsb", "arm_add", "arm_adc",
     "arm_sbc", "arm_rsc", "arm_tst", "arm_teq", "arm_cmp", "arm_cmn",
