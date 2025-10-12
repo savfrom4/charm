@@ -4,6 +4,4 @@ executable(
   sources: files(
     'main.cpp',
   ),
-
-  dependencies: [],
 )

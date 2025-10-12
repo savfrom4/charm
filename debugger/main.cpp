@@ -15,9 +15,23 @@
 #include <unistd.h>
 #include <vector>
 
+// NOTE: see .cpp file for sizes
+enum class DebugCommand : std::uint8_t {
+	NONE,
+	BREAK,            // set/remove breakpoint
+	NEXT,             // skip to next step (either instruction or internal)
+	SKIP,             // skip to next instruction
+	PAUSE_MODE,       // set pause mode (pause/continue)
+	PRINT_REGISTER,   // dump register
+	PRINT_AT_ADDRESS, // dump unsigned byte at addr n
+	DUMP,             // dump execution state
+	RESTORE,          // restore execution state
+	COUNT,
+};
+
 const std::string VERSION = "1.0.0";
 
-constexpr std::size_t hasher(const char *str, std::size_t hash = 5381) {
+inline constexpr std::size_t hasher(const char *str, std::size_t hash = 5381) {
 	return *str
 	           ? hasher(str + 1, (hash * 33) ^ static_cast<unsigned char>(*str))
 	           : hash;
@@ -187,7 +201,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 	case hasher("b"):
 	case hasher("break"): {
-		buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::BREAK);
+		buffer_write(temp_buffer, buffer_offset, DebugCommand::BREAK);
 		buffer_write<std::uint32_t>(temp_buffer, buffer_offset,
 		                            std::stoul(arg, 0, 0));
 		break;
@@ -195,7 +209,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 	case hasher("p"):
 	case hasher("print"): {
-		layer::DebugCommand type = layer::DebugCommand::PRINT_REGISTER;
+		DebugCommand type = DebugCommand::PRINT_REGISTER;
 		std::uint32_t value = 0;
 
 		switch (hasher(arg.c_str())) {
@@ -273,7 +287,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 		// address it is then
 		default: {
-			type = layer::DebugCommand::PRINT_AT_ADDRESS;
+			type = DebugCommand::PRINT_AT_ADDRESS;
 			value = std::stoul(arg, 0, 0);
 			break;
 		}
@@ -286,8 +300,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 	case hasher("c"):
 	case hasher("continue"): {
-		buffer_write(temp_buffer, buffer_offset,
-		             layer::DebugCommand::PAUSE_MODE);
+		buffer_write(temp_buffer, buffer_offset, DebugCommand::PAUSE_MODE);
 		buffer_write<std::uint8_t>(temp_buffer, buffer_offset, false);
 		paused = false;
 		break;
@@ -295,14 +308,14 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 	case hasher("n"):
 	case hasher("next"): {
-		buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::NEXT);
+		buffer_write(temp_buffer, buffer_offset, DebugCommand::NEXT);
 		paused = false;
 		break;
 	}
 
 	case hasher("s"):
 	case hasher("skip"): {
-		buffer_write(temp_buffer, buffer_offset, layer::DebugCommand::SKIP);
+		buffer_write(temp_buffer, buffer_offset, DebugCommand::SKIP);
 		paused = false;
 		break;
 	}

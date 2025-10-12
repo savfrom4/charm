@@ -1,6 +1,13 @@
 fs = import('fs')
 
 template_sources = [
+  'layer/armv4.cpp',
+  'layer/debug.cpp',
+  'layer/debug.hpp',
+  'layer/helpers.hpp',
+  'layer/state.hpp',
+  'layer/meson.build',
+
   'templates/code.hpp.tl',
   'templates/code.cpp.tl',
   'templates/memory.hpp.tl',

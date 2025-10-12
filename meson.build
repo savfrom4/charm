@@ -1,6 +1,5 @@
 project('charm', 'cpp')
 
-subdir('charm')
 subdir('debugger')
 subdir('generator')
 
