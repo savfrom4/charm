@@ -109,7 +109,7 @@ struct DataProcessing {
 
 // 4.7 Multiply and Multiply-Accumulate (MUL, MLA)
 struct Multiply {
-	bool accumulate;
+	bool a; // accumulate
 	Register rd, rn, rs, rm;
 
 	static Multiply decode(Instruction &instr, instr_t value);
@@ -118,7 +118,7 @@ struct Multiply {
 // 4.8 Multiply Long and Multiply-Accumulate Long (MULL,MLAL)
 struct MultiplyLong {
 	bool sign;             // unsigned (0) or signed (1)
-	bool accumulate;       // accumulate or not
+	bool a;                // accumulate or not
 	Register rd_hi, rd_lo; // low / high register to form a 32 bit value
 	Register rs, rm;
 
@@ -127,17 +127,17 @@ struct MultiplyLong {
 
 // 4.9 Single Data Transfer (LDR, STR)
 struct DataTransfer {
-	bool pre_indx; // add offset after (0) or before (1) transfer?
-	bool add;      // subtract (0) or add (1) offset from base?
-	bool byte;
-	bool write_back; // write address into base?
-	bool load;       // store (0) or Load (1)?
+	bool p;    // add offset after (0) or before (1) transfer?
+	bool u;    // subtract (0) or add (1) offset from base?
+	bool b;    // word (0) or byte (1)
+	bool w;    // write address into base?
+	bool load; // store (0) or Load (1)?
 
-	Register rn, rd;
+	Register rn, rd; // rn - base, rd - src/dst
 
 	union {
-		Shifter offset_reg;
-		uint16_t offset_imm;
+		Shifter reg;  // shifted register as offset
+		uint16_t imm; // immediate as offset
 	};
 
 	static DataTransfer decode(Instruction &instr, instr_t value);
@@ -145,23 +145,22 @@ struct DataTransfer {
 
 // 4.10 Halfword and Signed Data Transfer
 struct HalfWordDataTransfer {
-	bool pre_indx;   // add offset after (0) or before (1) transfer?
-	bool add;        // subtract (0) or add (1) offset from base?
-	bool write_back; // write address into base?
-	bool load;       // store (0) or Load (1)?
+	bool p;  // add offset after (0) or before (1) transfer?
+	bool u;  // subtract (0) or add (1) offset from base?
+	bool w;  // write address into base?
+	bool ld; // store (0) or Load (1)?
 
-	Register rn, rd;
+	Register rn, rd; // rn - base, rd - src/dst
 
 	enum {
-		SWP = 0b00,              // SWP (decoded seperatley)
 		HALF_WORD = 0b01,        // unsigned half-word
 		SIGNED_BYTE = 0b10,      // signed byte
 		SIGNED_HALF_WORD = 0b11, // signed half-word
 	} type;
 
 	union {
-		Register offset_reg;
-		uint8_t offset_imm;
+		Register rm; // offset in register
+		uint8_t imm; // offset as imm
 	};
 
 	static HalfWordDataTransfer decode(Instruction &instr, instr_t value,
@@ -170,21 +169,21 @@ struct HalfWordDataTransfer {
 
 // 4.11 Block Data Transfer (LDM, STM)
 struct BlockDataTransfer {
-	bool pre_indx;   // add offset after (0) or before (1) transfer?
-	bool add;        // subtract (0) or add (1) offset from base?
-	bool psr;        // unused for now
-	bool write_back; // write address into base?
-	bool load;       // store (0) or Load (1)?
+	bool p;   // add offset after (0) or before (1) transfer?
+	bool u;   // subtract (0) or add (1) offset from base?
+	bool psr; // unused for now
+	bool w;   // write back address into base?
+	bool ld;  // store (0) or Load (1)?
 
-	Register rn;
-	uint16_t reg_list;
+	Register rn;       // base
+	uint16_t reg_list; // register list, each bit is a register r0-r15
 
 	static BlockDataTransfer decode(instr_t value);
 };
 
 // 4.12 Single Data Swap (SWP)
 struct DataSwap {
-	bool byte;
+	bool b; // word (0) or byte (1)
 	Register rn, rd, rm;
 
 	static DataSwap decode(instr_t value);

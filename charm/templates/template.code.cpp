@@ -30,72 +30,72 @@ using namespace layer;
 	goto __start__;
 
 #define EQ(x)                                                                  \
-	if (z) {                                                                   \
+	if (Z) {                                                                   \
 		x;                                                                     \
 	}
 
 #define NE(x)                                                                  \
-	if (!z) {                                                                  \
+	if (!Z) {                                                                  \
 		x;                                                                     \
 	}
 
 #define CS(x)                                                                  \
-	if (cs) {                                                                  \
+	if (C) {                                                                   \
 		x;                                                                     \
 	}
 
 #define CC(x)                                                                  \
-	if (!cs) {                                                                 \
+	if (!C) {                                                                  \
 		x;                                                                     \
 	}
 
 #define MI(x)                                                                  \
-	if (mi) {                                                                  \
+	if (N) {                                                                   \
 		x;                                                                     \
 	}
 
 #define PL(x)                                                                  \
-	if (!mi) {                                                                 \
+	if (!N) {                                                                  \
 		x;                                                                     \
 	}
 
 #define VS(x)                                                                  \
-	if (vs) {                                                                  \
+	if (V) {                                                                   \
 		x;                                                                     \
 	}
 
 #define VC(x)                                                                  \
-	if (!vs) {                                                                 \
+	if (!V) {                                                                  \
 		x;                                                                     \
 	}
 
 #define HI(x)                                                                  \
-	if (cs && !z) {                                                            \
+	if (C && !Z) {                                                             \
 		x;                                                                     \
 	}
 
 #define LS(x)                                                                  \
-	if (!cs || z) {                                                            \
+	if (!C || Z) {                                                             \
 		x;                                                                     \
 	}
 
 #define GE(x)                                                                  \
-	if (mi == vs) {                                                            \
+	if (N == V) {                                                              \
 		x;                                                                     \
 	}
 
 #define LT(x)                                                                  \
-	if (mi != vs) {                                                            \
+	if (N != V) {                                                              \
 		x;                                                                     \
 	}
 
 #define GT(x)                                                                  \
-	if (!z && (mi == vs)) {                                                    \
+	if (!Z && (N == V)) {                                                      \
 		x;                                                                     \
 	}
 
 #define LE(x)                                                                  \
-	if (z || (mi != vs)) {                                                     \
+	if (Z || (N != V)) {                                                       \
 		x;                                                                     \
 	}
 
@@ -115,16 +115,16 @@ constexpr inline reg_value_t op2_lsl(ExecutionState &ps, bool s,
 		return value;
 
 	if (amount > 32) {
-		ps.cs = false;
+		ps.C = false;
 		return 0;
 	}
 
 	if (amount == 32) {
-		ps.cs = (value & 1) != 0; // bit 0
+		ps.C = (value & 1) != 0; // bit 0
 		return 0;
 	}
 
-	ps.cs = (value & (1u << (32 - amount))) != 0; // last shifted bit
+	ps.C = (value & (1u << (32 - amount))) != 0; // last shifted bit
 	return value << amount;
 }
 
@@ -134,16 +134,16 @@ constexpr inline reg_value_t op2_lsr(ExecutionState &ps, bool s,
 		return value;
 
 	if (amount > 32) {
-		ps.cs = false;
+		ps.C = false;
 		return 0;
 	}
 
 	if (amount == 32) {
-		ps.cs = (value & (1 << 31)) != 0; // bit 31
+		ps.C = (value & (1 << 31)) != 0; // bit 31
 		return 0;
 	}
 
-	ps.cs = (value & (1u << (amount - 1))) != 0; // last shifted bit
+	ps.C = (value & (1u << (amount - 1))) != 0; // last shifted bit
 	return value >> amount;
 }
 
@@ -153,11 +153,11 @@ constexpr inline reg_value_t op2_asr(ExecutionState &ps, bool s,
 		return value;
 
 	if (amount >= 32) {
-		ps.cs = (value & 0x80000000) != 0;
-		return ps.cs ? 0xFFFFFFFF : 0;
+		ps.C = (value & 0x80000000) != 0;
+		return ps.C ? 0xFFFFFFFF : 0;
 	}
 
-	ps.cs = (value & (1u << (amount - 1))) != 0; // last shifted bit
+	ps.C = (value & (1u << (amount - 1))) != 0; // last shifted bit
 	return ((int32_t)value) >> amount;
 }
 
@@ -170,7 +170,7 @@ constexpr inline reg_value_t op2_ror(ExecutionState &ps, bool s,
 		return value;
 	}
 
-	ps.cs = (value & (1u << (amount - 1))) != 0; // last shifted bit
+	ps.C = (value & (1u << (amount - 1))) != 0; // last shifted bit
 	return (value >> amount) | (value << (32 - amount));
 }
 

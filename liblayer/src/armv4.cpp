@@ -7,13 +7,15 @@
 #include <stdexcept>
 
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define UNPREDICTABLE(x, fmt, ...)                                             \
+	if (UNLIKELY(x)) {                                                         \
+		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,                     \
+		                 "UNPREDICTABLE: " fmt, __VA_ARGS__);                  \
+	}
+#define UNAFFECTED(x)
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#define BESWAP16(x) __builtin_bswap16(x)
-#define BESWAP32(x) __builtin_bswap32(x)
-#else
-#define BESWAP16(x) (x)
-#define BESWAP32(x) (x)
+#warning "Untested on big-endian systems, expect problems!"
 #endif
 
 namespace layer {
@@ -23,11 +25,11 @@ void ExecutionState::arm_add(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	if (s) {
-		cs = __builtin_add_overflow(r[rn], op2_value, &r[rd]);
 		int32_t unused;
-		vs = __builtin_sadd_overflow(r[rn], op2_value, &unused);
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		C = __builtin_add_overflow(r[rn], op2_value, &r[rd]);
+		V = __builtin_sadd_overflow(r[rn], op2_value, &unused);
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
 	} else {
 		r[rd] = r[rn] + op2_value;
 	}
@@ -39,13 +41,13 @@ void ExecutionState::arm_adc(bool s, Register rd, Register rn,
                              reg_value_t op2_value) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t operand = op2_value + cs;
+	reg_value_t operand = op2_value + C;
 	if (s) {
-		cs = __builtin_add_overflow(r[rn], operand, &r[rd]);
 		int32_t unused;
-		vs = __builtin_sadd_overflow(r[rn], operand, &unused);
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		C = __builtin_add_overflow(r[rn], operand, &r[rd]);
+		V = __builtin_sadd_overflow(r[rn], operand, &unused);
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
 	} else {
 		r[rd] = r[rn] + operand;
 	}
@@ -58,11 +60,11 @@ void ExecutionState::arm_sub(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	if (s) {
-		cs = !__builtin_sub_overflow(r[rn], op2_value, &r[rd]);
 		int32_t unused;
-		vs = __builtin_ssub_overflow(r[rn], op2_value, &unused);
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		C = !__builtin_sub_overflow(r[rn], op2_value, &r[rd]);
+		V = __builtin_ssub_overflow(r[rn], op2_value, &unused);
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
 	} else {
 		r[rd] = r[rn] - op2_value;
 	}
@@ -74,13 +76,13 @@ void ExecutionState::arm_sbc(bool s, Register rd, Register rn,
                              reg_value_t op2_value) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t operand = op2_value + !cs;
+	reg_value_t operand = op2_value + !C;
 	if (s) {
-		cs = !__builtin_sub_overflow(r[rn], operand, &r[rd]);
 		int32_t unused;
-		vs = __builtin_ssub_overflow(r[rn], operand, &unused);
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		C = !__builtin_sub_overflow(r[rn], operand, &r[rd]);
+		V = __builtin_ssub_overflow(r[rn], operand, &unused);
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
 	} else {
 		r[rd] = r[rn] - operand;
 	}
@@ -93,11 +95,12 @@ void ExecutionState::arm_cmp(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	uint32_t result;
-	cs = !__builtin_sub_overflow(r[rn], op2_value, &result);
 	int32_t unused;
-	vs = __builtin_ssub_overflow(r[rn], op2_value, &unused);
-	mi = (result >> 31) & 1;
-	z = !result;
+
+	C = !__builtin_sub_overflow(r[rn], op2_value, &result);
+	V = __builtin_ssub_overflow(r[rn], op2_value, &unused);
+	N = (result >> 31) & 1;
+	Z = !result;
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
@@ -108,8 +111,10 @@ void ExecutionState::arm_mov(bool s, Register rd, Register rn,
 
 	r[rd] = op2_value;
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -120,11 +125,11 @@ void ExecutionState::arm_rsb(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	if (s) {
-		cs = !__builtin_sub_overflow(op2_value, r[rn], &r[rd]);
 		int32_t unused;
-		vs = __builtin_ssub_overflow(op2_value, r[rn], &unused);
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		C = !__builtin_sub_overflow(op2_value, r[rn], &r[rd]);
+		V = __builtin_ssub_overflow(op2_value, r[rn], &unused);
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
 	} else {
 		r[rd] = op2_value - r[rn];
 	}
@@ -136,14 +141,14 @@ void ExecutionState::arm_rsc(bool s, Register rd, Register rn,
                              reg_value_t op2_value) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t operand = r[rn] + !cs;
+	reg_value_t operand = r[rn] + !C;
 
 	if (s) {
-		cs = !__builtin_sub_overflow(op2_value, operand, &r[rd]);
 		int32_t unused;
-		vs = __builtin_ssub_overflow(op2_value, operand, &unused);
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		C = !__builtin_sub_overflow(op2_value, operand, &r[rd]);
+		V = __builtin_ssub_overflow(op2_value, operand, &unused);
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
 	} else {
 		r[rd] = op2_value - operand;
 	}
@@ -158,8 +163,10 @@ void ExecutionState::arm_and(bool s, Register rd, Register rn,
 	r[rd] = r[rn] & op2_value;
 
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -172,8 +179,10 @@ void ExecutionState::arm_eor(bool s, Register rd, Register rn,
 	r[rd] = r[rn] ^ op2_value;
 
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -185,8 +194,10 @@ void ExecutionState::arm_orr(bool s, Register rd, Register rn,
 
 	r[rd] = r[rn] | op2_value;
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -198,8 +209,10 @@ void ExecutionState::arm_bic(bool s, Register rd, Register rn,
 
 	r[rd] = r[rn] & ~op2_value;
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -212,8 +225,10 @@ void ExecutionState::arm_mvn(bool s, Register rd, Register rn,
 	r[rd] = ~op2_value;
 
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -224,8 +239,12 @@ void ExecutionState::arm_tst(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t result = r[rn] & op2_value;
-	mi = (result >> 31) & 1;
-	z = !result;
+
+	// NOTE: s is ignored, flags are always set
+	N = (result >> 31) & 1;
+	Z = !result;
+	UNAFFECTED(C);
+	UNAFFECTED(V);
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
@@ -235,8 +254,12 @@ void ExecutionState::arm_teq(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t result = r[rn] ^ op2_value;
-	mi = (result >> 31) & 1;
-	z = !result;
+
+	// NOTE: s is ignored, flags are always set
+	N = (result >> 31) & 1;
+	Z = !result;
+	UNAFFECTED(C);
+	UNAFFECTED(V);
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
@@ -246,29 +269,32 @@ void ExecutionState::arm_cmn(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t result;
-	cs = __builtin_add_overflow(r[rn], op2_value, &result);
 	int32_t unused;
-	vs = __builtin_sadd_overflow(r[rn], op2_value, &unused);
-	mi = (result >> 31) & 1;
-	z = !result;
+
+	// NOTE: s is ignored, flags are always set
+	C = __builtin_add_overflow(r[rn], op2_value, &result);
+	V = __builtin_sadd_overflow(r[rn], op2_value, &unused);
+	N = (result >> 31) & 1;
+	Z = !result;
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
 void ExecutionState::arm_mul(bool s, Register rd, Register rn, Register rs,
                              Register rm) {
-	LAYER_DBE_NEXT(*this, "%s: before", __func__);
+	UNPREDICTABLE(rd == PC || rm == PC || rs == PC,
+	              "arm_mul: Rd/Rm or Rs must not be PC.");
+	UNPREDICTABLE(rd == rm, "arm_mul: Rd and Rm must be different registers.");
 
-	if (UNLIKELY(rd == rm)) {
-		LAYER_DBE_LOG(*this, "%s",
-		              "Warning: UNPREDICTABLE: Rd and Rm must be different!");
-	}
+	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	r[rd] = r[rm] * r[rs];
 
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -276,17 +302,18 @@ void ExecutionState::arm_mul(bool s, Register rd, Register rn, Register rs,
 
 void ExecutionState::arm_mla(bool s, Register rd, Register rn, Register rs,
                              Register rm) {
-	LAYER_DBE_NEXT(*this, "%s: before", __func__);
+	UNPREDICTABLE(rd == PC || rm == PC || rs == PC,
+	              "arm_mla: Rd/Rm or Rs must not be PC.");
+	UNPREDICTABLE(rd == rm, "arm_mla: Rd and Rm must be different registers.");
 
-	if (UNLIKELY(rd == rm)) {
-		LAYER_DBE_LOG(*this, "%s",
-		              "Warning: UNPREDICTABLE: Rd and Rm must be different!");
-	}
+	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	r[rd] = r[rm] * r[rs] + r[rn];
 	if (s) {
-		mi = (r[rd] >> 31) & 1;
-		z = !r[rd];
+		N = (r[rd] >> 31) & 1;
+		Z = !r[rd];
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -294,23 +321,29 @@ void ExecutionState::arm_mla(bool s, Register rd, Register rn, Register rs,
 
 void ExecutionState::arm_mull(bool s, bool sign, Register rd_lo, Register rd_hi,
                               Register rm, Register rs) {
+	UNPREDICTABLE(rd_lo == PC || rd_hi == PC || rm == PC || rs == PC,
+	              "arm_mull: RdLo/RdHi/Rm or Rs must not be PC.");
+	UNPREDICTABLE(rd_lo == rd_hi,
+	              "arm_mull: RdLo and RdHi must be different registers.");
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	uint64_t result;
+
 	if (sign) {
-		int64_t lhs = static_cast<int32_t>(r[rm]);
-		int64_t rhs = static_cast<int32_t>(r[rs]);
-		result = static_cast<uint64_t>(lhs * rhs);
+		result = (int64_t)r[rm] * (int64_t)r[rs];
 	} else {
-		result = static_cast<uint64_t>(r[rm]) * static_cast<uint64_t>(r[rs]);
+		result = (uint64_t)r[rm] * (uint64_t)r[rs];
 	}
 
-	r[rd_lo] = static_cast<uint32_t>(result);
-	r[rd_hi] = static_cast<uint32_t>(result >> 32);
+	r[rd_lo] = (uint32_t)result;
+	r[rd_hi] = (uint32_t)(result >> 32);
 
 	if (s) {
-		mi = (result >> 63) & 1;
-		z = (result == 0);
+		N = (result >> 63) & 1;
+		Z = (result == 0);
+		UNAFFECTED(cf);
+		UNAFFECTED(vf);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
@@ -318,38 +351,41 @@ void ExecutionState::arm_mull(bool s, bool sign, Register rd_lo, Register rd_hi,
 
 void ExecutionState::arm_mlal(bool s, bool sign, Register rd_lo, Register rd_hi,
                               Register rm, Register rs) {
+	UNPREDICTABLE(rd_lo == PC || rd_hi == PC || rm == PC || rs == PC,
+	              "arm_mlal: RdLo/RdHi/Rm or Rs must not be PC.");
+	UNPREDICTABLE(rd_lo == rd_hi,
+	              "arm_mlal: RdLo and RdHi must be different registers.");
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	uint64_t result;
+	uint64_t acc = ((uint64_t)(r[rd_hi]) << 32) | r[rd_lo];
+
 	if (sign) {
-		int64_t lhs = static_cast<int32_t>(r[rm]);
-		int64_t rhs = static_cast<int32_t>(r[rs]);
-		result = static_cast<uint64_t>(lhs * rhs);
+		result = (int64_t)r[rm] * (int64_t)r[rs] + (int64_t)acc;
 	} else {
-		result = static_cast<uint64_t>(r[rm]) * static_cast<uint64_t>(r[rs]);
+		result = (uint64_t)r[rm] * (uint64_t)r[rs] + acc;
 	}
 
-	uint64_t acc = (static_cast<uint64_t>(r[rd_hi]) << 32) | r[rd_lo];
-	acc += result;
-
-	r[rd_lo] = static_cast<uint32_t>(acc);
-	r[rd_hi] = static_cast<uint32_t>(acc >> 32);
+	r[rd_lo] = (uint32_t)result;
+	r[rd_hi] = (uint32_t)(result >> 32);
 
 	if (s) {
-		mi = (acc >> 63) & 1;
-		z = (acc == 0);
+		N = (result >> 63) & 1;
+		Z = (result == 0);
+		UNAFFECTED(C);
+		UNAFFECTED(V);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
-                             bool write_back, Register rn, Register rd,
-                             reg_value_t offset) {
+void ExecutionState::arm_ldr(bool p, bool u, bool b, bool w, Register rn,
+                             Register rd, reg_value_t offset) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t base = r[rn];
-	reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
+	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
@@ -365,28 +401,20 @@ void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
 		throw std::runtime_error("arm_ldr: resolved address is 0x00000000");
 	}
 
-	if (byte) {
+	if (b) {
 		memset(&r[rd], 0, sizeof(reg_value_t));
 		memcpy(&r[rd], mem, sizeof(uint8_t));
 	} else {
 		memcpy(&r[rd], mem, sizeof(uint32_t));
 	}
 
-	// for big endian, both word and byte transfers need to be swapped
-	r[rd] = BESWAP32(r[rd]);
-
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value read: 0x%X",
 	                 r[rd]);
 
-	if (write_back || !pre_indx) {
-		// SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
-		if (UNLIKELY(r[rn] == PC)) {
-			LAYER_DBE_LOG_IF(
-			    *this, dbe.flags & Debugee::NEXT, "%s",
-			    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
-		}
+	if (w || !p) {
+		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
 
-		r[rn] = base + (add ? offset : -offset);
+		r[rn] = base + (u ? offset : -offset);
 		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 		                 "wrote back to r%d: 0x%X", rn, r[rn]);
 	}
@@ -394,17 +422,15 @@ void ExecutionState::arm_ldr(bool pre_indx, bool add, bool byte,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
-                             bool write_back, Register rn, Register rd,
-                             reg_value_t offset) {
+void ExecutionState::arm_str(bool p, bool u, bool b, bool w, Register rn,
+                             Register rd, reg_value_t offset) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t base = r[rn];
 	reg_value_t value = r[rd];
-	reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
+	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
 
-	/* SPECIAL CASE: When RD is PC, it will actually store ADDR + 12. Since PC
-	 * is always ADDR + 8, we just add 4 to it. */
+	/* SPECIAL CASE: When RD is PC, store ADDR + 12 */
 	if (rd == PC) {
 		value += 4;
 	}
@@ -423,11 +449,7 @@ void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
-	// for big endian, we swap the value to make sure its stored as
-	// little-endian
-	value = BESWAP32(value);
-
-	if (byte) {
+	if (b) {
 		memcpy(mem, &value, sizeof(uint8_t));
 	} else {
 		memcpy(mem, &value, sizeof(uint32_t));
@@ -436,15 +458,10 @@ void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 	                 "value wrote to %p: 0x%X", mem, value);
 
-	if (write_back || !pre_indx) {
-		// SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
-		if (UNLIKELY(r[rn] == PC)) {
-			LAYER_DBE_LOG_IF(
-			    *this, dbe.flags & Debugee::NEXT, "%s",
-			    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
-		}
+	if (w || !p) {
+		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
 
-		r[rn] = base + (add ? offset : -offset);
+		r[rn] = base + (u ? offset : -offset);
 		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 		                 "wrote back to r%d: 0x%X", rn, r[rn]);
 	}
@@ -452,13 +469,12 @@ void ExecutionState::arm_str(bool pre_indx, bool add, bool byte,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
-                              Register rn, Register rd, uint8_t type,
-                              uint32_t offset) {
+void ExecutionState::arm_ldrh(bool p, bool u, bool w, Register rn, Register rd,
+                              uint8_t type, reg_value_t offset) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t base = r[rn];
-	reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
+	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
@@ -475,11 +491,6 @@ void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
 	}
 
 	switch (type) {
-	case 0b00:
-		LAYER_DBE_LOG(*this, "%s", "error: SWP is not implemented!");
-		LAYER_DBE_SEND_PAUSED(*this);
-		throw std::runtime_error("arm_ldrh: SWP is not implemented!");
-
 	case 0b01: // LDRH
 		r[rd] = 0;
 		memcpy(&r[rd], mem, sizeof(uint16_t));
@@ -498,21 +509,13 @@ void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
 		break;
 	}
 
-	// for big endian, both word and byte transfers need to be swapped
-	r[rd] = BESWAP32(r[rd]);
-
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value read: 0x%X",
 	                 r[rd]);
 
-	if (write_back || !pre_indx) {
-		// SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
-		if (UNLIKELY(r[rn] == PC)) {
-			LAYER_DBE_LOG_IF(
-			    *this, dbe.flags & Debugee::NEXT, "%s",
-			    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
-		}
+	if (w || !p) {
+		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
 
-		r[rn] = base + (add ? offset : -offset);
+		r[rn] = base + (u ? offset : -offset);
 		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 		                 "wrote back to r%d: 0x%X", rn, r[rn]);
 	}
@@ -520,14 +523,13 @@ void ExecutionState::arm_ldrh(bool pre_indx, bool add, bool write_back,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
-                              Register rn, Register rd, uint8_t type,
-                              uint32_t offset) {
+void ExecutionState::arm_strh(bool p, bool u, bool w, Register rn, Register rd,
+                              uint8_t type, uint32_t offset) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t base = r[rn];
 	reg_value_t value = r[rd];
-	reg_value_t addr = pre_indx ? base + (add ? offset : -offset) : base;
+	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
 
 	/* SPECIAL CASE: When RD is PC, it will actually store ADDR + 12. Since PC
 	 * is always ADDR + 8, we just add 4 to it. */
@@ -549,10 +551,6 @@ void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
 		throw std::runtime_error("arm_strh: resolved address is 0x00000000");
 	}
 
-	// for big endian, we swap the value to make sure its stored as
-	// little-endian
-	value = BESWAP32(value);
-
 	switch (type) {
 	case 0b01: // STRH
 		memcpy(mem, &value, sizeof(uint16_t));
@@ -570,15 +568,10 @@ void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 	                 "value stored to %p: 0x%X", mem, r[rd]);
 
-	if (write_back || !pre_indx) {
-		// SPECIAL CASE: write-back to PC is UNPREDICTABLE, catch that
-		if (UNLIKELY(r[rn] == PC)) {
-			LAYER_DBE_LOG_IF(
-			    *this, dbe.flags & Debugee::NEXT, "%s",
-			    "UNPREDICTABLE: writeback to PC as Rn is not allowed!");
-		}
+	if (w || !p) {
+		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
 
-		r[rn] = base + (add ? offset : -offset);
+		r[rn] = base + (u ? offset : -offset);
 		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 		                 "wrote back to r%d: 0x%X", rn, r[rn]);
 	}
@@ -586,22 +579,22 @@ void ExecutionState::arm_strh(bool pre_indx, bool add, bool write_back,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
-                             Register rn, reg_value_t reg_list) {
+void ExecutionState::arm_ldm(bool p, bool u, bool w, Register rn,
+                             reg_value_t reg_list) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t base = r[rn];
 	reg_value_t n = __builtin_popcount(reg_list);
 	reg_value_t addr;
 
-	if (add) {
-		addr = pre_indx ? base + 4 : base;
+	if (u) {
+		addr = p ? base + 4 : base;
 	} else {
-		addr = pre_indx ? base - (n * 4) : base - 4;
+		addr = p ? base - (n * 4) : base - 4;
 	}
 
-	if (write_back) {
-		r[rn] = add ? base + n * 4 : base - n * 4;
+	if (w) {
+		r[rn] = u ? base + n * 4 : base - n * 4;
 		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 		                 "wrote back to r%d: 0x%X", rn, r[rn]);
 	}
@@ -629,7 +622,6 @@ void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
 		                 __func__);
 
 		memcpy(&r[i], mem, sizeof(uint32_t));
-		r[i] = BESWAP32(r[i]);
 
 		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
 		                 "value read from %p: 0x%X", mem, r[i]);
@@ -642,18 +634,18 @@ void ExecutionState::arm_ldm(bool pre_indx, bool add, bool write_back,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
-                             Register rn, reg_value_t reg_list) {
+void ExecutionState::arm_stm(bool p, bool u, bool w, Register rn,
+                             reg_value_t reg_list) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	reg_value_t base = r[rn];
 	reg_value_t n = __builtin_popcount(reg_list);
 	reg_value_t addr;
 
-	if (add) {
-		addr = pre_indx ? base + 4 : base;
+	if (u) {
+		addr = p ? base + 4 : base;
 	} else {
-		addr = pre_indx ? base - (n * 4) : base - 4;
+		addr = p ? base - (n * 4) : base - 4;
 	}
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
@@ -685,12 +677,12 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
 
 		LAYER_DBE_NEXT(*this, "%s: after write", __func__);
 
-		if (!write_back || written) {
+		if (!w || written) {
 			continue;
 		}
 
 		// We write-back now
-		r[rn] = add ? base + n * 4 : base - n * 4;
+		r[rn] = u ? base + n * 4 : base - n * 4;
 		written = true;
 
 		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
@@ -699,5 +691,4 @@ void ExecutionState::arm_stm(bool pre_indx, bool add, bool write_back,
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
-
 } // namespace layer

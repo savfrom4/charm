@@ -182,7 +182,7 @@ Multiply Multiply::decode(Instruction &instr, instr_t value) {
 	instr.set_cflags = get_bits<20>(value); /* Set condition flags, bit 20 */
 
 	return {
-	    .accumulate = (bool)get_bits<21>(value), /* Accumulate, bit 21 */
+	    .a = (bool)get_bits<21>(value), /* Accumulate, bit 21 */
 	    .rd = static_cast<Register>(
 	        get_bits<16, 4>(value)), /* Rd register, bits 16-19 */
 	    .rn = static_cast<Register>(
@@ -199,8 +199,8 @@ MultiplyLong MultiplyLong::decode(Instruction &instr, instr_t value) {
 	instr.set_cflags = get_bits<20>(value); /* Set condition flags, bit 20 */
 
 	return {
-	    .sign = (bool)get_bits<22>(value),       /* Unsigned, bit 22 */
-	    .accumulate = (bool)get_bits<21>(value), /* Accumulate, bit 21 */
+	    .sign = (bool)get_bits<22>(value), /* Unsigned, bit 22 */
+	    .a = (bool)get_bits<21>(value),    /* Accumulate, bit 21 */
 	    .rd_hi = static_cast<Register>(
 	        get_bits<16, 4>(value)), /* RdHi register, bits 16-19 */
 	    .rd_lo = static_cast<Register>(
@@ -217,11 +217,11 @@ DataTransfer DataTransfer::decode(Instruction &instr, instr_t value) {
 	instr.immediate = !get_bits<25>(value); /* Immediate, bit 25 */
 
 	DataTransfer data_trans = {
-	    .pre_indx = (bool)get_bits<24>(value),   /* Pre/Post indexing, bit 24 */
-	    .add = (bool)get_bits<23>(value),        /* Up/Down, bit 23 */
-	    .byte = (bool)get_bits<22>(value),       /* Byte/Word, bit 22 */
-	    .write_back = (bool)get_bits<21>(value), /* Writeback, bit 21 */
-	    .load = (bool)get_bits<20>(value),       /* Load/Store, bit 20 */
+	    .p = (bool)get_bits<24>(value),    /* Pre/Post indexing, bit 24 */
+	    .u = (bool)get_bits<23>(value),    /* Up/Down, bit 23 */
+	    .b = (bool)get_bits<22>(value),    /* Byte/Word, bit 22 */
+	    .w = (bool)get_bits<21>(value),    /* Writeback, bit 21 */
+	    .load = (bool)get_bits<20>(value), /* Load/Store, bit 20 */
 	    .rn = static_cast<Register>(
 	        get_bits<16, 4>(value)), /* Rn base register, bits 16-19 */
 	    .rd = static_cast<Register>(
@@ -229,9 +229,9 @@ DataTransfer DataTransfer::decode(Instruction &instr, instr_t value) {
 	};
 
 	if (instr.immediate) {
-		data_trans.offset_imm = get_bits<0, 12>(value);
+		data_trans.imm = get_bits<0, 12>(value);
 	} else {
-		data_trans.offset_reg = Shifter::decode(value);
+		data_trans.reg = Shifter::decode(value);
 	}
 
 	return data_trans;
@@ -243,10 +243,10 @@ HalfWordDataTransfer HalfWordDataTransfer::decode(Instruction &instr,
 	instr.immediate = imm;
 
 	HalfWordDataTransfer hw_data_trans = {
-	    .pre_indx = (bool)get_bits<24>(value),   /* Pre/Post indexing, bit 24 */
-	    .add = (bool)get_bits<23>(value),        /* Up/Down, bit 23 */
-	    .write_back = (bool)get_bits<21>(value), /* Writeback, bit 21 */
-	    .load = (bool)get_bits<20>(value),       /* Load/Store, bit 20 */
+	    .p = (bool)get_bits<24>(value),  /* Pre/Post indexing, bit 24 */
+	    .u = (bool)get_bits<23>(value),  /* Up/Down, bit 23 */
+	    .w = (bool)get_bits<21>(value),  /* Writeback, bit 21 */
+	    .ld = (bool)get_bits<20>(value), /* Load/Store, bit 20 */
 	    .rn =
 	        static_cast<Register>(get_bits<16, 4>(value)), /* Rn, bits 16-19 */
 	    .rd =
@@ -261,10 +261,9 @@ HalfWordDataTransfer HalfWordDataTransfer::decode(Instruction &instr,
 		uint8_t offt_high = static_cast<uint16_t>(
 		    get_bits<8, 4>(value)); /* Imm offset High bits 8-11 */
 
-		hw_data_trans.offset_imm =
-		    static_cast<uint8_t>((offt_high << 4) | offt_low);
+		hw_data_trans.imm = static_cast<uint8_t>((offt_high << 4) | offt_low);
 	} else {
-		hw_data_trans.offset_reg =
+		hw_data_trans.rm =
 		    static_cast<Register>(get_bits<0, 4>(value)); /* Rm, bits 0-3 */
 	}
 
@@ -274,11 +273,11 @@ HalfWordDataTransfer HalfWordDataTransfer::decode(Instruction &instr,
 // 4.11 Block Data Transfer (LDM, STM)
 BlockDataTransfer BlockDataTransfer::decode(instr_t value) {
 	return {
-	    .pre_indx = (bool)get_bits<24>(value),   /* Pre/Post indexing, bit 24 */
-	    .add = (bool)get_bits<23>(value),        /* Up/Down, bit 23 */
-	    .psr = (bool)get_bits<22>(value),        /* PSR & Force user, bit 22 */
-	    .write_back = (bool)get_bits<21>(value), /* Writeback, bit 21 */
-	    .load = (bool)get_bits<20>(value),       /* Load/Store, bit 20 */
+	    .p = (bool)get_bits<24>(value),   /* Pre/Post indexing, bit 24 */
+	    .u = (bool)get_bits<23>(value),   /* Up/Down, bit 23 */
+	    .psr = (bool)get_bits<22>(value), /* PSR & Force user, bit 22 */
+	    .w = (bool)get_bits<21>(value),   /* Writeback, bit 21 */
+	    .ld = (bool)get_bits<20>(value),  /* Load/Store, bit 20 */
 	    .rn =
 	        static_cast<Register>(get_bits<16, 4>(value)), /* Rn, bits 16-19 */
 	    .reg_list = (std::uint16_t)get_bits<0, 16>(
@@ -289,7 +288,7 @@ BlockDataTransfer BlockDataTransfer::decode(instr_t value) {
 // 4.12 Single Data Swap (SWP)
 DataSwap DataSwap::decode(instr_t value) {
 	return {
-	    .byte = (bool)get_bits<22>(value), /* Byte/Word, bit 22  */
+	    .b = (bool)get_bits<22>(value), /* Byte/Word, bit 22  */
 	    .rn = static_cast<Register>(
 	        get_bits<16, 4>(value)), /* Rn base register, bits 16-19 */
 	    .rd = static_cast<Register>(
@@ -357,13 +356,13 @@ std::string Instruction::dump() const {
 		const auto &mul = std::get<Multiply>(group);
 
 		// mul/mla rd, rm, rs
-		ss << utils::sformat("%s\t%s, %s, %s", (mul.accumulate ? "mla" : "mul"),
+		ss << utils::sformat("%s\t%s, %s, %s", (mul.a ? "mla" : "mul"),
 		                     REGISTER_TABLE[(int)mul.rd],
 		                     REGISTER_TABLE[(int)mul.rm],
 		                     REGISTER_TABLE[(int)mul.rs]);
 
 		// , rn
-		if (mul.accumulate) {
+		if (mul.a) {
 			ss << ", " << REGISTER_TABLE[(int)mul.rn];
 		}
 
@@ -377,11 +376,11 @@ std::string Instruction::dump() const {
 		ss << (mul_long.sign ? "s" : "u");
 
 		// (s/u)mul/mlal rd_lo, rd_hi, rm, rs
-		ss << utils::sformat(
-		    "%s\t%s, %s, %s, %s", mul_long.accumulate ? "mlal" : "mull",
-		    REGISTER_TABLE[(int)mul_long.rd_lo],
-		    REGISTER_TABLE[(int)mul_long.rd_hi],
-		    REGISTER_TABLE[(int)mul_long.rm], REGISTER_TABLE[(int)mul_long.rs]);
+		ss << utils::sformat("%s\t%s, %s, %s, %s", mul_long.a ? "mlal" : "mull",
+		                     REGISTER_TABLE[(int)mul_long.rd_lo],
+		                     REGISTER_TABLE[(int)mul_long.rd_hi],
+		                     REGISTER_TABLE[(int)mul_long.rm],
+		                     REGISTER_TABLE[(int)mul_long.rs]);
 		break;
 	}
 
@@ -389,9 +388,8 @@ std::string Instruction::dump() const {
 		const auto &data_trans = std::get<DataTransfer>(group);
 
 		// push/pop rd
-		if (immediate && data_trans.write_back &&
-		    data_trans.rn == Register::SP && data_trans.offset_imm == 4 &&
-		    data_trans.add == data_trans.load) {
+		if (immediate && data_trans.w && data_trans.rn == Register::SP &&
+		    data_trans.imm == 4 && data_trans.u == data_trans.load) {
 			ss << utils::sformat("%s\t{%s}", data_trans.load ? "pop" : "push",
 			                     REGISTER_TABLE[(int)data_trans.rd]);
 			break;
@@ -399,39 +397,39 @@ std::string Instruction::dump() const {
 
 		// ldr/str(b) rd, [rn
 		ss << utils::sformat("%s%s\t%s, [%s", data_trans.load ? "ldr" : "str",
-		                     data_trans.byte ? "b" : "",
+		                     data_trans.b ? "b" : "",
 		                     REGISTER_TABLE[(int)data_trans.rd],
 		                     REGISTER_TABLE[(int)data_trans.rn]);
 
 		// close the square bracket if post indexed
-		if (!data_trans.pre_indx) {
+		if (!data_trans.p) {
 			ss << "]";
 		}
 
 		if (immediate) {
 			//, #imm
-			ss << utils::sformat(", #%s%" PRIu16, data_trans.add ? "" : "-",
-			                     data_trans.offset_imm);
+			ss << utils::sformat(", #%s%" PRIu16, data_trans.u ? "" : "-",
+			                     data_trans.imm);
 		} else {
-			ss << REGISTER_TABLE[(int)data_trans.offset_reg.rm];
+			ss << REGISTER_TABLE[(int)data_trans.reg.rm];
 
 			// , shift
-			if (data_trans.offset_reg.amount_or_rs != 0) {
+			if (data_trans.reg.amount_or_rs != 0) {
 				ss << utils::sformat(
-				    ", %s%s", SHIFT_TABLE[(int)data_trans.offset_reg.type],
-				    (data_trans.offset_reg.is_reg
-				         ? utils::sformat(", %s",
-				                          REGISTER_TABLE[data_trans.offset_reg
-				                                             .amount_or_rs])
+				    ", %s%s", SHIFT_TABLE[(int)data_trans.reg.type],
+				    (data_trans.reg.is_reg
+				         ? utils::sformat(
+				               ", %s",
+				               REGISTER_TABLE[data_trans.reg.amount_or_rs])
 				         : utils::sformat(" #%" PRIu8,
-				                          data_trans.offset_reg.amount_or_rs)));
+				                          data_trans.reg.amount_or_rs)));
 			}
 		}
 
-		if (data_trans.pre_indx) {
+		if (data_trans.p) {
 			ss << "]";
 
-			if (data_trans.write_back) {
+			if (data_trans.w) {
 				ss << "!";
 			}
 		}
@@ -449,30 +447,29 @@ std::string Instruction::dump() const {
 		    "shw",
 		};
 
-		ss << utils::sformat("%s%s\t%s, [%s",
-		                     hw_data_trans.load ? "ldr" : "str",
+		ss << utils::sformat("%s%s\t%s, [%s", hw_data_trans.ld ? "ldr" : "str",
 		                     type_table[(int)hw_data_trans.type],
 		                     REGISTER_TABLE[(int)hw_data_trans.rd],
 		                     REGISTER_TABLE[(int)hw_data_trans.rn]);
 
 		// close the square bracket if post indexed
-		if (!hw_data_trans.pre_indx) {
+		if (!hw_data_trans.p) {
 			ss << "]";
 		}
 
 		if (immediate) {
 			//, #imm
-			ss << utils::sformat(", #%s%" PRIu8, hw_data_trans.add ? "" : "-",
-			                     hw_data_trans.offset_imm);
+			ss << utils::sformat(", #%s%" PRIu8, hw_data_trans.u ? "" : "-",
+			                     hw_data_trans.imm);
 		} else {
 			//, reg
-			ss << REGISTER_TABLE[(int)hw_data_trans.offset_reg];
+			ss << REGISTER_TABLE[(int)hw_data_trans.rm];
 		}
 
-		if (hw_data_trans.pre_indx) {
+		if (hw_data_trans.p) {
 			ss << "]";
 
-			if (hw_data_trans.write_back) {
+			if (hw_data_trans.w) {
 				ss << "!";
 			}
 		}
@@ -483,15 +480,14 @@ std::string Instruction::dump() const {
 	case InstructionGroup::BLOCK_DATA_TRANSFER: {
 		const auto &blk_data_trans = std::get<BlockDataTransfer>(group);
 
-		if (blk_data_trans.rn == Register::SP && blk_data_trans.write_back) {
-			ss << utils::sformat("%s\t{",
-			                     (blk_data_trans.load ? "pop" : "push"));
+		if (blk_data_trans.rn == Register::SP && blk_data_trans.w) {
+			ss << utils::sformat("%s\t{", (blk_data_trans.ld ? "pop" : "push"));
 		} else {
 			// ldm/stm rn(!), {}
 			ss << utils::sformat("%s\t%s%s, {",
-			                     blk_data_trans.load ? "ldm" : "stm",
+			                     blk_data_trans.ld ? "ldm" : "stm",
 			                     REGISTER_TABLE[(int)blk_data_trans.rn],
-			                     blk_data_trans.write_back ? "!" : "");
+			                     blk_data_trans.w ? "!" : "");
 		}
 
 		bool first = true;
@@ -513,8 +509,7 @@ std::string Instruction::dump() const {
 		const auto &data_swap = std::get<DataSwap>(group);
 
 		// swpb/swp rd, rm, [rn]
-		ss << utils::sformat("%s\t%s, %s, [%s]",
-		                     data_swap.byte ? "swpb " : "swp ",
+		ss << utils::sformat("%s\t%s, %s, [%s]", data_swap.b ? "swpb " : "swp ",
 		                     REGISTER_TABLE[(int)data_swap.rd],
 		                     REGISTER_TABLE[(int)data_swap.rm],
 		                     REGISTER_TABLE[(int)data_swap.rn]);

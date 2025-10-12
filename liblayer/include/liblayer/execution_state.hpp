@@ -63,28 +63,28 @@ enum Register : std::uint8_t {
 
 class ExecutionState {
   public:
-	bool cs, /* carry set */
-	    vs;  /* overflow set */
-	bool mi, /* negative */
-	    z;   /* zero */
+	bool C = false, /* carry */
+	    V = false;  /* overflow */
+	bool N = false, /* negative */
+	    Z = false;  /* zero */
 
 	std::array<reg_value_t, REG_COUNT> r = {
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
-	    0,
+	    0,                                   // r0
+	    0,                                   // r1
+	    0,                                   // r2
+	    0,                                   // r3
+	    0,                                   // r4
+	    0,                                   // r5
+	    0,                                   // r6
+	    0,                                   // r7
+	    0,                                   // r8
+	    0,                                   // r9
+	    0,                                   // r10
+	    0,                                   // r11
+	    0,                                   // r12
 	    LAYER_STACK_BASE + LAYER_STACK_SIZE, // stack pointer
-	    0,
-	    0,
+	    0,                                   // lr
+	    0,                                   // pc
 	};
 
 	// if stack size is too big, we switch to heap
@@ -102,6 +102,7 @@ class ExecutionState {
 #endif
 
 	inline ExecutionState() { memory_init(); }
+
 	inline virtual ~ExecutionState() {}
 
 	inline ExecutionState(const ExecutionState &) = delete;
@@ -156,18 +157,16 @@ class ExecutionState {
 	void arm_mlal(bool s, bool sign, Register rd_hi, Register rd_lo,
 	              Register rs, Register rm);
 
-	void arm_ldr(bool pre_indx, bool add, bool byte, bool write_back,
-	             Register rn, Register rd, reg_value_t offset);
-	void arm_str(bool pre_indx, bool add, bool byte, bool write_back,
-	             Register rn, Register rd, reg_value_t offset);
-	void arm_ldm(bool pre_indx, bool add, bool write_back, Register rn,
-	             reg_value_t reg_list);
-	void arm_stm(bool pre_indx, bool add, bool write_back, Register rn,
-	             reg_value_t reg_list);
-	void arm_ldrh(bool pre_indx, bool add, bool write_back, Register rn,
-	              Register rd, uint8_t type, reg_value_t offset);
-	void arm_strh(bool pre_indx, bool add, bool write_back, Register rn,
-	              Register rd, uint8_t type, reg_value_t offset);
+	void arm_ldr(bool p, bool u, bool b, bool w, Register rn, Register rd,
+	             reg_value_t offset);
+	void arm_str(bool p, bool u, bool b, bool w, Register rn, Register rd,
+	             reg_value_t offset);
+	void arm_ldm(bool p, bool u, bool w, Register rn, reg_value_t reg_list);
+	void arm_stm(bool p, bool u, bool w, Register rn, reg_value_t reg_list);
+	void arm_ldrh(bool p, bool u, bool w, Register rn, Register rd,
+	              uint8_t type, reg_value_t offset);
+	void arm_strh(bool p, bool u, bool w, Register rn, Register rd,
+	              uint8_t type, reg_value_t offset);
 
 	// TODO: implement armv5, add thumbv1
 

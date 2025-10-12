@@ -151,7 +151,7 @@ void Recompiler::emit_arm_data_processing(std::ostream &os,
 	if (instr.immediate) {
 		os << OPCODE_TABLE[(int)data.op] << "("
 		   << (instr.set_cflags ? "true" : "false")
-		   << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
+		   << MINIFY_COMMENT_COMMA(" /* s */, ")
 
 		   << REGISTER_TABLE[(int)data.rd]
 		   << MINIFY_COMMENT_COMMA(" /* rd */, ")
@@ -167,7 +167,7 @@ void Recompiler::emit_arm_data_processing(std::ostream &os,
 	if (data.op2_reg.is_reg) {
 		os << OPCODE_TABLE[(int)data.op] << "("
 		   << (instr.set_cflags ? "true" : "false")
-		   << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
+		   << MINIFY_COMMENT_COMMA(" /* s */, ")
 
 		   << REGISTER_TABLE[(int)data.rd]
 		   << MINIFY_COMMENT_COMMA(" /* rd */, ")
@@ -187,7 +187,7 @@ void Recompiler::emit_arm_data_processing(std::ostream &os,
 	} else {
 		os << OPCODE_TABLE[(int)data.op] << "("
 		   << (instr.set_cflags ? "true" : "false")
-		   << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
+		   << MINIFY_COMMENT_COMMA(" /* s */, ")
 
 		   << REGISTER_TABLE[(int)data.rd]
 		   << MINIFY_COMMENT_COMMA(" /* rd */, ")
@@ -211,9 +211,9 @@ void Recompiler::emit_arm_multiply(std::ostream &os,
                                    arm::addr_t address) {
 	const auto &mul = std::get<arm::Multiply>(instr.group);
 
-	os << (mul.accumulate ? "arm_mla" : "arm_mul") << "("
+	os << (mul.a ? "arm_mla" : "arm_mul") << "("
 	   << (instr.set_cflags ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
+	   << MINIFY_COMMENT_COMMA(" /* s */, ")
 
 	   << REGISTER_TABLE[(int)mul.rd] << MINIFY_COMMENT_COMMA(" /* rd */, ")
 	   << REGISTER_TABLE[(int)mul.rn] << MINIFY_COMMENT_COMMA(" /* rn */, ")
@@ -226,9 +226,9 @@ void Recompiler::emit_arm_multiply_long(std::ostream &os,
                                         arm::addr_t address) {
 	const auto &mul_long = std::get<arm::MultiplyLong>(instr.group);
 
-	os << (mul_long.accumulate ? "arm_mlal" : "arm_mull") << "("
+	os << (mul_long.a ? "arm_mlal" : "arm_mull") << "("
 	   << (instr.set_cflags ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* set_cond */, ")
+	   << MINIFY_COMMENT_COMMA(" /* s */, ")
 
 	   << (mul_long.sign ? "true" : "false")
 	   << MINIFY_COMMENT_COMMA(" /* sign */, ")
@@ -293,17 +293,17 @@ void Recompiler::emit_arm_data_transfer(std::ostream &os,
 
 	os << (data_trans.load ? "arm_ldr(" : "arm_str(")
 
-	   << (data_trans.pre_indx ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* pre_indx */, ")
+	   << (data_trans.p ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* p */, ")
 
-	   << (data_trans.add ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* add */, ")
+	   << (data_trans.u ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* u */, ")
 
-	   << (data_trans.byte ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* byte */, ")
+	   << (data_trans.b ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* b */, ")
 
-	   << (data_trans.write_back ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* write_back */, ")
+	   << (data_trans.w ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* w */, ")
 
 	   << REGISTER_TABLE[(int)data_trans.rn]
 	   << MINIFY_COMMENT_COMMA(" /* rn */, ")
@@ -314,27 +314,22 @@ void Recompiler::emit_arm_data_transfer(std::ostream &os,
 	os << std::hex;
 
 	if (instr.immediate) {
-		os << "0x" << (int)data_trans.offset_imm
-		   << MINIFY_COMMENT(" /* offset */");
+		os << "0x" << (int)data_trans.imm << MINIFY_COMMENT(" /* offset */");
 	} else {
-		if (data_trans.offset_reg.is_reg) {
-			os << SHIFT_TABLE[(int)data_trans.offset_reg.type]
-			   << "(*this, false, r["
-			   << REGISTER_TABLE[(int)data_trans.offset_reg.rm] << "]"
+		if (data_trans.reg.is_reg) {
+			os << SHIFT_TABLE[(int)data_trans.reg.type] << "(*this, false, r["
+			   << REGISTER_TABLE[(int)data_trans.reg.rm] << "]"
 			   << MINIFY_COMMENT_COMMA(" /* rm */,")
 
-			   << "r["
-			   << REGISTER_TABLE[(int)data_trans.offset_reg.amount_or_rs] << "]"
-			   << MINIFY_COMMENT(" /* rs */") << ")";
+			   << "r[" << REGISTER_TABLE[(int)data_trans.reg.amount_or_rs]
+			   << "]" << MINIFY_COMMENT(" /* rs */") << ")";
 		} else {
-			os << SHIFT_TABLE[(int)data_trans.offset_reg.type]
-			   << "(*this, false, r["
-			   << REGISTER_TABLE[(int)data_trans.offset_reg.rm] << "]"
+			os << SHIFT_TABLE[(int)data_trans.reg.type] << "(*this, false, r["
+			   << REGISTER_TABLE[(int)data_trans.reg.rm] << "]"
 			   << MINIFY_COMMENT_COMMA(" /* rm */,")
 
-			   << "0x" << std::hex
-			   << (std::uint32_t)data_trans.offset_reg.amount_or_rs << std::dec
-			   << MINIFY_COMMENT(" /* amount */") << ")";
+			   << "0x" << std::hex << (std::uint32_t)data_trans.reg.amount_or_rs
+			   << std::dec << MINIFY_COMMENT(" /* amount */") << ")";
 		}
 	}
 
@@ -348,15 +343,15 @@ void Recompiler::emit_arm_halfword_data_transfer(std::ostream &os,
 	const auto &hw_data_trans =
 	    std::get<arm::HalfWordDataTransfer>(instr.group);
 
-	os << (hw_data_trans.load ? "arm_ldrh(" : "arm_strh(")
-	   << (hw_data_trans.pre_indx ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* pre_indx */, ")
+	os << (hw_data_trans.ld ? "arm_ldrh(" : "arm_strh(")
+	   << (hw_data_trans.p ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* p */, ")
 
-	   << (hw_data_trans.add ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* add */, ")
+	   << (hw_data_trans.u ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* u */, ")
 
-	   << (hw_data_trans.write_back ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* write_back */, ")
+	   << (hw_data_trans.w ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* w */, ")
 
 	   << REGISTER_TABLE[(int)hw_data_trans.rn]
 	   << MINIFY_COMMENT_COMMA(" /* rn */, ")
@@ -368,10 +363,9 @@ void Recompiler::emit_arm_halfword_data_transfer(std::ostream &os,
 	   << MINIFY_COMMENT_COMMA(" /* type */, ");
 
 	if (instr.immediate) {
-		os << "0x" << (int)hw_data_trans.offset_imm
-		   << MINIFY_COMMENT(" /* offset */");
+		os << "0x" << (int)hw_data_trans.imm << MINIFY_COMMENT(" /* offset */");
 	} else {
-		os << "r[" << REGISTER_TABLE[(int)hw_data_trans.offset_reg] << "]"
+		os << "r[" << REGISTER_TABLE[(int)hw_data_trans.rm] << "]"
 		   << MINIFY_COMMENT(" /* rm */");
 	}
 
@@ -382,15 +376,15 @@ void Recompiler::emit_arm_block_data_transfer(std::ostream &os,
                                               const arm::Instruction &instr,
                                               arm::addr_t address) {
 	const auto &blk_data_trans = std::get<arm::BlockDataTransfer>(instr.group);
-	os << (blk_data_trans.load ? "arm_ldm(" : "arm_stm(")
-	   << (blk_data_trans.pre_indx ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* pre_indx */, ")
+	os << (blk_data_trans.ld ? "arm_ldm(" : "arm_stm(")
+	   << (blk_data_trans.p ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* p */, ")
 
-	   << (blk_data_trans.add ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* add */, ")
+	   << (blk_data_trans.u ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* u */, ")
 
-	   << (blk_data_trans.write_back ? "true" : "false")
-	   << MINIFY_COMMENT_COMMA(" /* write_back */, ")
+	   << (blk_data_trans.w ? "true" : "false")
+	   << MINIFY_COMMENT_COMMA(" /* w */, ")
 
 	   << REGISTER_TABLE[(int)blk_data_trans.rn]
 	   << MINIFY_COMMENT_COMMA(" /* rn */, ") << std::hex << "0x"
@@ -483,7 +477,7 @@ void Recompiler::emit_arm_modifies_pc(std::ostream &os,
 	case arm::InstructionGroup::HALFWORD_DATA_TRANSFER: {
 		const auto &hw_data_trans =
 		    std::get<arm::HalfWordDataTransfer>(instr.group);
-		if (!hw_data_trans.load) {
+		if (!hw_data_trans.ld) {
 			return;
 		}
 
@@ -497,7 +491,7 @@ void Recompiler::emit_arm_modifies_pc(std::ostream &os,
 	case arm::InstructionGroup::BLOCK_DATA_TRANSFER: {
 		const auto &blk_data_trans =
 		    std::get<arm::BlockDataTransfer>(instr.group);
-		if (!blk_data_trans.load) {
+		if (!blk_data_trans.ld) {
 			return;
 		}
 
