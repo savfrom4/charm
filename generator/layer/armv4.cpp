@@ -1,18 +1,11 @@
-#include "liblayer/debug.hpp"
-#include "liblayer/execution_state.hpp"
+#include "debug.hpp"
+#include "helpers.hpp"
+#include "state.hpp"
 #include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <endian.h>
 #include <stdexcept>
-
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#define UNPREDICTABLE(x, fmt, ...)                                             \
-	if (UNLIKELY(x)) {                                                         \
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,                     \
-		                 "UNPREDICTABLE: " fmt, __VA_ARGS__);                  \
-	}
-#define UNAFFECTED(x)
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #warning "Untested on big-endian systems, expect problems!"
@@ -390,7 +383,7 @@ void ExecutionState::arm_ldr(bool p, bool u, bool b, bool w, Register rn,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
 
-	const void *mem = reinterpret_cast<const void *>(address_resolve_raw(addr));
+	const void *mem = reinterpret_cast<const void *>(_address_resolve(addr));
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -438,7 +431,7 @@ void ExecutionState::arm_str(bool p, bool u, bool b, bool w, Register rn,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
 
-	void *mem = reinterpret_cast<void *>(address_resolve_raw(addr));
+	void *mem = reinterpret_cast<void *>(_address_resolve(addr));
 
 	if (UNLIKELY(!mem)) {
 		LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
@@ -479,7 +472,7 @@ void ExecutionState::arm_ldrh(bool p, bool u, bool w, Register rn, Register rd,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
 
-	const char *mem = reinterpret_cast<const char *>(address_resolve_raw(addr));
+	const char *mem = reinterpret_cast<const char *>(_address_resolve(addr));
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -540,7 +533,7 @@ void ExecutionState::arm_strh(bool p, bool u, bool w, Register rn, Register rd,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
 
-	char *mem = reinterpret_cast<char *>(address_resolve_raw(addr));
+	char *mem = reinterpret_cast<char *>(_address_resolve(addr));
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -602,7 +595,7 @@ void ExecutionState::arm_ldm(bool p, bool u, bool w, Register rn,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
 
-	const char *mem = reinterpret_cast<const char *>(address_resolve_raw(addr));
+	const char *mem = reinterpret_cast<const char *>(_address_resolve(addr));
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
 
@@ -613,7 +606,7 @@ void ExecutionState::arm_ldm(bool p, bool u, bool w, Register rn,
 		throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
 	}
 
-	for (reg_value_t i = 0; i < REG_COUNT; i++) {
+	for (reg_value_t i = 0; i < REGISTER_COUNT; i++) {
 		if (!((reg_list >> i) & 1)) {
 			continue;
 		}
@@ -651,7 +644,7 @@ void ExecutionState::arm_stm(bool p, bool u, bool w, Register rn,
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
 	                 addr);
 
-	char *mem = reinterpret_cast<char *>(address_resolve_raw(addr));
+	char *mem = reinterpret_cast<char *>(_address_resolve(addr));
 	bool written = false;
 
 	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
@@ -663,7 +656,7 @@ void ExecutionState::arm_stm(bool p, bool u, bool w, Register rn,
 		throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
 	}
 
-	for (reg_value_t i = 0; i < REG_COUNT; i++) {
+	for (reg_value_t i = 0; i < REGISTER_COUNT; i++) {
 		if (!((reg_list >> i) & 1)) {
 			continue;
 		}

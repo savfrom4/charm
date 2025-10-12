@@ -1,3 +1,4 @@
--Iliblayer/include
--Icharm/include
--Icharm/external/ELFIO
+-Igenerator/layer
+-Igenerator/templates
+-Iinclude
+-Iexternal/ELFIO

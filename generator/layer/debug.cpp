@@ -1,5 +1,5 @@
-#include "liblayer/debug.hpp"
-#include "liblayer/execution_state.hpp"
+#include "debug.hpp"
+#include "state.hpp"
 #include <arpa/inet.h>
 #include <cstddef>
 #include <cstdio>
@@ -32,7 +32,7 @@ const std::array<size_t, (int)layer::DebugCommand::COUNT> COMMAND_SIZE_TABLE = {
 
 namespace layer {
 
-Debugee::Debugee(ExecutionState &_ps) : _ps(_ps) {
+Debugee::Debugee(CPUState &_ps) : _ps(_ps) {
 	_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (_socket < 0) {
 		throw std::runtime_error(

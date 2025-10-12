@@ -43,7 +43,7 @@
 
 namespace layer {
 
-class ExecutionState;
+class CPUState;
 
 // NOTE: see .cpp file for sizes
 enum class DebugCommand : std::uint8_t {
@@ -70,7 +70,7 @@ class Debugee {
 	};
 	std::uint32_t flags = PAUSED;
 
-	Debugee(ExecutionState &ps);
+	Debugee(CPUState &ps);
 	~Debugee();
 
 	// these two functions are called either each instruction or inside
@@ -96,7 +96,7 @@ class Debugee {
 	void send_paused();
 
   private:
-	ExecutionState &_ps;
+	CPUState &_ps;
 	int _socket = -1, _connection = -1;
 	DebugCommand _command =
 	    DebugCommand::NONE; /* current command (to index into size array) */

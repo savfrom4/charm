@@ -5,5 +5,5 @@ executable(
     'main.cpp',
   ),
 
-  dependencies: [liblayer_dep],
+  dependencies: [],
 )
