@@ -1,12 +1,14 @@
 fs = import('fs')
 
 template_sources = [
+  'include/helpers.hpp',
+  'include/debug.hpp',
+  'include/state.hpp',
+
   'src/armv4.cpp',
   'src/debug.cpp',
-  'src/debug.hpp',
-  'src/helpers.hpp',
-  'src/state.hpp',
   'src/meson.build',
+  'src/meson_options.txt',
 
   'templates/code.hpp.tl',
   'templates/code.cpp.tl',

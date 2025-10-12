@@ -1,29 +1,35 @@
 project('output', 'cpp', default_options: ['b_lto=true'])
+
 add_project_arguments('-Wno-unused-label', language: 'cpp')
-
-subdir('liblayer')
-
-include_directories = ['.']
-dependencies = [liblayer_dep]
-
-sources = files(
-  'code.cpp',
-  'data.cpp',
-)
 
 if get_option('debugging')
   add_project_arguments('-DLAYER_DEBUG', language: 'cpp')
 endif
 
+include_directories: [
+  'include',
+]
+
+sources = files(
+  'src/armv4.cpp',
+  'src/code.cpp',
+  'src/data.cpp',
+  'src/debug.cpp',
+  'src/memory.cpp',
+)
+
+dependencies: [
+]
+
 if get_option('library')
-  liboutput_dep = library(
+  output_dep = library(
     'output',
     include_directories: include_directories,
     sources: sources,
     dependencies: dependencies,
   )
 else
-  executable(
+  output_dep = executable(
     'output',
     include_directories: include_directories,
     sources: sources,

@@ -15,27 +15,11 @@
 namespace charm::recomp {
 
 void Recompiler::step_emit(const std::string &output_dir) {
-	static const auto liblayer_path =
-	    std::filesystem::current_path() / "liblayer";
-
-	static const auto symlink_path =
-	    std::filesystem::path{output_dir} / "liblayer";
-
-	if (!std::filesystem::exists(liblayer_path)) {
-		throw std::runtime_error(
-		    "Recompiler::step_emit: Copy or symlink the \"liblayer\" directory "
-		    "from source "
-		    "to cwd!.");
+	if (!std::filesystem::exists(output_dir)) {
+		std::filesystem::create_directory(output_dir);
 	}
 
-	std::filesystem::create_directory(output_dir);
-
-	if (!std::filesystem::exists(symlink_path)) {
-		std::filesystem::create_symlink(liblayer_path, symlink_path);
-	}
-
-	emit_meson_options(output_dir);
-	emit_meson_project(output_dir);
+	emit_setup_project(output_dir);
 
 	std::cout << "> Code ..." << std::endl;
 	emit_code_header(output_dir);
@@ -46,48 +30,57 @@ void Recompiler::step_emit(const std::string &output_dir) {
 	emit_data_source(output_dir);
 }
 
-void Recompiler::emit_meson_options(const std::string &output_dir) {
-	const auto meson_options_path = std::filesystem::path{
-	    std::filesystem::path{output_dir} / "meson_options.txt"};
+void Recompiler::emit_setup_project(const std::filesystem::path &output_dir) {
+	auto output_include_dir = output_dir / "include";
+	auto output_src_dir = output_dir / "src";
 
-	if (std::filesystem::exists(meson_options_path)) {
-		return;
+	if (!std::filesystem::exists(output_include_dir)) {
+		std::filesystem::create_directory(output_include_dir);
 	}
 
-	std::ofstream ofs{meson_options_path};
-	ofs << "option('debugging', type: 'boolean', value: false, "
-	       "description: "
-	       "'Enable debugging via charm-dbg')"
-	    << std::endl;
-
-	ofs << "option('library', type: 'boolean', value: true, description: "
-	       "'Build as library')"
-	    << std::endl;
-}
-
-void Recompiler::emit_meson_project(const std::string &output_dir) {
-	const auto meson_project_path = std::filesystem::path{
-	    std::filesystem::path{output_dir} / "meson.build"};
-
-	if (std::filesystem::exists(meson_project_path)) {
-		return;
+	if (!std::filesystem::exists(output_src_dir)) {
+		std::filesystem::create_directory(output_src_dir);
 	}
 
-	std::ofstream ofs;
-	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-	ofs.open(meson_project_path);
-	ofs << Template("templates/template.meson.build").str();
+	for (auto &file : std::filesystem::directory_iterator{"generator"}) {
+		const auto filename = file.path().filename().string();
+
+		// dont copy over templates
+		if (filename.find(".tl") != std::string::npos) {
+			continue;
+		}
+
+		// copy to /include
+		if (filename.find(".hpp") != std::string::npos) {
+			std::filesystem::copy_file(
+			    file, output_include_dir / filename,
+			    std::filesystem::copy_options::skip_existing);
+			continue;
+		}
+
+		// copy to src/
+		if (filename.find(".cpp") != std::string::npos) {
+			std::filesystem::copy_file(
+			    file, output_src_dir / filename,
+			    std::filesystem::copy_options::skip_existing);
+			continue;
+		}
+
+		// otherwise copy to root dir
+		std::filesystem::copy_file(
+		    file, output_dir / filename,
+		    std::filesystem::copy_options::skip_existing);
+	}
 }
 
-void Recompiler::emit_code_header(const std::string &output_dir) {
-	const auto code_hpp_path =
-	    std::filesystem::path{std::filesystem::path{output_dir} / "code.hpp"};
+void Recompiler::emit_code_header(const std::filesystem::path &output_dir) {
+	const auto code_hpp_path = output_dir / "include" / "code.hpp";
 
 	std::ofstream ofs;
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_hpp_path);
 
-	Template tl{"templates/template.code.hpp"};
+	Template tl{"generator/code.hpp.tl"};
 
 	// emit exported functions
 	tl.format("exported_functions", [&](std::stringstream &ss) {
@@ -113,15 +106,14 @@ void Recompiler::emit_code_header(const std::string &output_dir) {
 	ofs << tl.str();
 }
 
-void Recompiler::emit_code_source(const std::string &output_dir) {
-	const auto code_cpp_path =
-	    std::filesystem::path{std::filesystem::path{output_dir} / "code.cpp"};
+void Recompiler::emit_code_source(const std::filesystem::path &output_dir) {
+	const auto code_cpp_path = output_dir / "src" / "code.cpp";
 
 	std::ofstream ofs;
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_cpp_path);
 
-	Template tl{"templates/template.code.cpp"};
+	Template tl{"generator/code.cpp.tl"};
 
 	tl.format("got_mappings", [&](std::stringstream &ss) {
 		for (auto &functions : _funs_reloc) {
@@ -152,9 +144,8 @@ void Recompiler::emit_code_source(const std::string &output_dir) {
 	ofs << tl.str();
 }
 
-void Recompiler::emit_data_header(const std::string &output_dir) {
-	const auto code_hpp_path =
-	    std::filesystem::path{std::filesystem::path{output_dir} / "data.hpp"};
+void Recompiler::emit_data_header(const std::filesystem::path &output_dir) {
+	const auto code_hpp_path = output_dir / "include" / "data.hpp";
 
 	std::ofstream ofs;
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
@@ -194,9 +185,8 @@ void Recompiler::emit_data_header(const std::string &output_dir) {
 	}
 }
 
-void Recompiler::emit_data_source(const std::string &output_dir) {
-	const auto code_hpp_path =
-	    std::filesystem::path{std::filesystem::path{output_dir} / "data.cpp"};
+void Recompiler::emit_data_source(const std::filesystem::path &output_dir) {
+	const auto code_hpp_path = output_dir / "src" / "data.cpp";
 
 	std::ofstream ofs;
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
@@ -279,17 +269,19 @@ void Recompiler::emit_code_address_mappings(Template &tl) {
 			auto name = symbol_name_map(section->get_name());
 			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-			ss << utils::sformat(
-			          "\tif(address >= "
-			          "reinterpret_cast<std::uintptr_t>(g_%s_DATA.data()) && "
-			          "address < "
-			          "reinterpret_cast<std::uintptr_t>(g_%s_DATA.data()) + "
-			          "sizeof(g_%s_DATA)) {",
-			          name, name, name)
+			ss << utils::sformat("\tif(address >= "
+			                     "reinterpret_cast<std::uintptr_t>(g_%"
+			                     "s_DATA.data()) && "
+			                     "address < "
+			                     "reinterpret_cast<std::uintptr_t>(g_%"
+			                     "s_DATA.data()) + "
+			                     "sizeof(g_%s_DATA)) {",
+			                     name, name, name)
 			   << std::endl;
 
 			ss << utils::sformat(
-			          "\t\treturn 0x%X + static_cast<uint32_t>(address - "
+			          "\t\treturn 0x%X + static_cast<uint32_t>(address "
+			          "- "
 			          "reinterpret_cast<uintptr_t>(g_%s_DATA.data()));",
 			          section->get_address(), name)
 			   << std::endl;

@@ -2,6 +2,7 @@
 #include "arm.hpp"
 #include "template.hpp"
 #include <elfio/elfio.hpp>
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 
@@ -27,15 +28,14 @@ class Recompiler {
 	void analyze_reloc_dyn();
 	void analyze_exported_functions();
 
-	void emit_meson_options(const std::string &output_dir);
-	void emit_meson_project(const std::string &output_dir);
+	void emit_setup_project(const std::filesystem::path &output_dir);
 
 	/* Code level */
 
-	void emit_data_header(const std::string &output_dir);
-	void emit_data_source(const std::string &output_dir);
-	void emit_code_source(const std::string &output_dir);
-	void emit_code_header(const std::string &output_dir);
+	void emit_data_header(const std::filesystem::path &output_dir);
+	void emit_data_source(const std::filesystem::path &output_dir);
+	void emit_code_source(const std::filesystem::path &output_dir);
+	void emit_code_header(const std::filesystem::path &output_dir);
 
 	/* Section level */
 
