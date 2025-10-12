@@ -9,7 +9,6 @@
 #include <iostream>
 #include <ostream>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 
 namespace charm::recomp {
