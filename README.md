@@ -20,9 +20,9 @@ This is my a long-term TODO list!
 - Expand the instruction set support to `armv5te`.
 - Expand `dump` mode functionality.
 
-# charm-cli - Command line interface
+# charm - Command line recompiler interfaces
 
-`charm-cli` has two modes of operation: `recomp` (Recompile) and `dump` (Dump/dissasemble).
+`charm` has two modes of operation: `recomp` (Recompile) and `dump` (Dump/dissasemble).
 `dump` is self-explanatory -- it just dumps dissassembly and other information into output file.
 .
 
