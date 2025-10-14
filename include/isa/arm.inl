@@ -1,9 +1,5 @@
-/*
- * PS: I wish C++ was a real language and i didn't have to do it...
- */
-
+// PS: RIP clangd, i wish i didnt have to do .inls in year 2025...
 #pragma once
-#include <arch.hpp>
 
 namespace charm::isa::arm {
 
