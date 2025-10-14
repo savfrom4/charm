@@ -1,3 +1,2 @@
--Icharm/include
--Icharm/generator/include
+-Iinclude
 -Iexternal/ELFIO

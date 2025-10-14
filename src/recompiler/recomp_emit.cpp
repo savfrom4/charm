@@ -1,7 +1,3 @@
-#include "arm.hpp"
-#include "recomp.hpp"
-#include "template.hpp"
-#include "utils.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -10,6 +6,11 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+
+#include <isa/arm.hpp>
+#include <recompiler/recomp.hpp>
+#include <recompiler/template.hpp>
+#include <utils.hpp>
 
 namespace charm::recomp {
 
@@ -49,7 +50,7 @@ void Recompiler::emit_setup_project(const std::filesystem::path &output_dir) {
 			continue;
 		}
 
-		// copy to /include
+		// copy to include/
 		if (filename.find(".hpp") != std::string::npos) {
 			std::filesystem::copy_file(
 			    file, output_include_dir / filename,
@@ -193,69 +194,69 @@ void Recompiler::emit_data_source(const std::filesystem::path &output_dir) {
 
 	ofs << "#include \"data.hpp\"" << std::endl << std::endl;
 
-	for (auto &section : _elf.sections) {
-		if (!section_is_data(section.get())) {
-			continue;
-		}
+	// for (auto &section : _elf.sections) {
+	// 	if (!section_is_data(section.get())) {
+	// 		continue;
+	// 	}
 
-		const std::uint8_t *data =
-		    reinterpret_cast<const std::uint8_t *>(section->get_data());
+	// 	const std::uint8_t *data =
+	// 	    reinterpret_cast<const std::uint8_t *>(section->get_data());
 
-		auto name = symbol_name_map(section->get_name());
-		std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+	// 	auto name = symbol_name_map(section->get_name());
+	// 	std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-		std::stringstream ss;
+	// 	std::stringstream ss;
 
-		// for non-got table we just write raw bytes or 0es
-		if (section->get_name().find(".got") == std::string::npos) {
-			ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-			            ? "std::array<std::uint8_t, "
-			            : "const std::array<std::uint8_t, ")
-			    << section->get_size() << "> g_" << name << "_DATA = {"
-			    << std::endl;
+	// 	// for non-got table we just write raw bytes or 0es
+	// 	if (section->get_name().find(".got") == std::string::npos) {
+	// 		ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
+	// 		            ? "std::array<std::uint8_t, "
+	// 		            : "const std::array<std::uint8_t, ")
+	// 		    << section->get_size() << "> g_" << name << "_DATA = {"
+	// 		    << std::endl;
 
-			ss << "\t";
-			for (charm::arm::addr_t i = 0; i < section->get_size(); i++) {
-				ss << (data ? static_cast<int>(data[i]) : 0) << ", ";
+	// 		ss << "\t";
+	// 		for (auto i = 0; i < section->get_size(); i++) {
+	// 			ss << (data ? static_cast<int>(data[i]) : 0) << ", ";
 
-				if (i % 8 == 7) {
-					ss << std::endl;
-					ss << "\t";
-				}
-			}
-		} else { // for got we map addresses that we know
-			ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-			            ? "std::array<std::uint32_t, "
-			            : "const std::array<std::uint32_t, ")
-			    << section->get_size() / sizeof(std::uint32_t) << "> g_" << name
-			    << "_DATA = {" << std::endl;
+	// 			if (i % 8 == 7) {
+	// 				ss << std::endl;
+	// 				ss << "\t";
+	// 			}
+	// 		}
+	// 	} else { // for got we map addresses that we know
+	// 		ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
+	// 		            ? "std::array<std::uint32_t, "
+	// 		            : "const std::array<std::uint32_t, ")
+	// 		    << section->get_size() / sizeof(std::uint32_t) << "> g_" << name
+	// 		    << "_DATA = {" << std::endl;
 
-			ss << std::hex;
+	// 		ss << std::hex;
 
-			// map addresses
-			for (arm::addr_t i = 0; i < section->get_size();
-			     i += sizeof(arm::instr_t)) {
-				arm::addr_t mapped_address = 0;
+	// 		// map addresses
+	// 		for (auto i = 0; i < section->get_size();
+	// 		     i += sizeof(arm::instr_t)) {
+	// 			arm::addr_t mapped_address = 0;
 
-				for (auto &mapping : _got_mappings) {
-					arm::addr_t offset =
-					    std::get<0>(mapping) - section->get_address();
-					if (offset != i) {
-						continue;
-					}
+	// 			for (auto &mapping : _got_mappings) {
+	// 				arm::addr_t offset =
+	// 				    std::get<0>(mapping) - section->get_address();
+	// 				if (offset != i) {
+	// 					continue;
+	// 				}
 
-					mapped_address = std::get<1>(mapping);
-					break;
-				}
+	// 				mapped_address = std::get<1>(mapping);
+	// 				break;
+	// 			}
 
-				ss << "\t0x" << mapped_address << "," << std::endl;
-			}
+	// 			ss << "\t0x" << mapped_address << "," << std::endl;
+	// 		}
 
-			ss << std::dec;
-		}
+	// 		ss << std::dec;
+	// 	}
 
-		ofs << ss.rdbuf() << std::endl << "};" << std::endl;
-	}
+	// 	ofs << ss.rdbuf() << std::endl << "};" << std::endl;
+	// }
 }
 
 void Recompiler::emit_code_address_mappings(Template &tl) {

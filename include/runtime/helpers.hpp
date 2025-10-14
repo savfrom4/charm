@@ -1,5 +1,5 @@
 #pragma once
-#include "state.hpp"
+#include <arch.hpp>
 
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #define UNPREDICTABLE(x, fmt, ...)                                             \
@@ -88,7 +88,7 @@
 		x;                                                                     \
 	}
 
-namespace layer {
+namespace charm::runtime {
 
 constexpr inline reg_value_t op2_lsl(ExecutionState &ps, bool s,
                                      reg_value_t value, reg_value_t amount) {
@@ -155,4 +155,4 @@ constexpr inline reg_value_t op2_ror(ExecutionState &ps, bool s,
 	return (value >> amount) | (value << (32 - amount));
 }
 
-} // namespace layer
+} // namespace charm::runtime

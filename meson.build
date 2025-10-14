@@ -1,4 +1,2 @@
 project('charm', 'cpp')
-
-subdir('charm-dbg')
-subdir('charm')
+subdir('src')

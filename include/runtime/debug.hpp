@@ -6,42 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
-// -------------------------------------
-// ------------- OPTIONS ---------------
-// -------------------------------------
-
-#ifndef LAYER_DEBUG_PORT
-#define LAYER_DEBUG_PORT (6969)
-#endif
-
-// following macros are used internally inside ExecutionState
-// defines because debug context isn't always available (when LAYER_DEBUG is not
-// set, for example)
-#ifdef LAYER_DEBUG
-#define LAYER_DBE_NEXT(ps, fmt, ...)                                           \
-	(ps).dbe.format(fmt, __VA_ARGS__);                                         \
-	(ps).dbe.next();
-
-#define LAYER_DBE_SKIP(ps, fmt, ...)                                           \
-	(ps).dbe.format(fmt, __VA_ARGS__);                                         \
-	(ps).dbe.skip();
-
-#define LAYER_DBE_LOG(ps, fmt, ...) (ps).dbe.send_format(fmt, __VA_ARGS__)
-#define LAYER_DBE_LOG_IF(ps, cond, fmt, ...)                                   \
-	if ((cond)) {                                                              \
-		(ps).dbe.send_format(fmt, __VA_ARGS__);                                \
-	}
-
-#define LAYER_DBE_SEND_PAUSED(ps) (ps).dbe.send_paused()
-#else
-#define LAYER_DBE_NEXT(ps, fmt, ...)
-#define LAYER_DBE_SKIP(ps, fmt, ...)
-#define LAYER_DBE_LOG(ps, fmt, ...)
-#define LAYER_DBE_LOG_IF(ps, cond, fmt, ...)
-#define LAYER_DBE_SEND_PAUSED(ps)
-#endif
-
-namespace layer {
+namespace charm::runtime {
 
 class CPUState;
 
@@ -114,4 +79,4 @@ class Debugee {
 	void process_command();
 };
 
-} // namespace layer
+} // namespace charm::runtime

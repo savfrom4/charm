@@ -1,6 +1,7 @@
 #pragma once
-#include "utils.hpp"
+#include "../utils.hpp"
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <sstream>
@@ -8,17 +9,18 @@
 #include <string>
 #include <unordered_map>
 
-namespace charm {
+namespace charm::recomp {
 
 class Template {
   public:
-	inline Template(const std::string &filename) {
+	inline Template(const std::filesystem::path &path) {
 		std::stringstream ss;
 
-		std::ifstream ifs{filename};
+		std::ifstream ifs{path};
 		if (ifs.fail()) {
 			throw std::invalid_argument(
-			    "Template::ctor: Failed to open file \"" + filename + "\".");
+			    "Template::ctor: Failed to open file \"" + path.string() +
+			    "\".");
 		}
 
 		ss << ifs.rdbuf();
@@ -108,4 +110,4 @@ class Template {
 	std::unordered_map<std::string, std::string::size_type> _tokens;
 };
 
-} // namespace charm
+} // namespace charm::recomp

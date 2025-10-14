@@ -1,6 +1,6 @@
-#include "elfio/elfio.hpp"
-#include <arm.hpp>
-#include <recomp.hpp>
+#include <elfio/elfio.hpp>
+#include <isa/arm.hpp>
+#include <recompiler/recomp.hpp>
 
 inline static const std::string VERSION = "0.2.0";
 inline static const std::string RECOMP = "recomp";
@@ -118,14 +118,13 @@ void disassemble(std::ofstream &ofs, ELFIO::section *section) {
 	const char *data = section->get_data();
 	size_t data_size = section->get_size();
 
-	for (charm::arm::addr_t i = 0; i < data_size;
-	     i += sizeof(charm::arm::instr_t)) {
-		charm::arm::instr_t instr_raw;
-		memcpy(&instr_raw, data + i, sizeof(charm::arm::instr_t));
+	for (charm::Word i = 0; i < data_size; i += sizeof(charm::Word)) {
+		charm::Word instr_raw;
+		memcpy(&instr_raw, data + i, sizeof(charm::Word));
 
 		ofs << "\t0x" << std::hex << section->get_address() + i << ": "
 		    << std::dec;
-		ofs << charm::arm::Instruction::decode(instr_raw).dump() << std::endl;
+		ofs << charm::isa::arm::Instruction(instr_raw).dump() << std::endl;
 	}
 
 	ofs << std::endl;

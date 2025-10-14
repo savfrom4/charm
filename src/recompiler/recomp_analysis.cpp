@@ -1,8 +1,8 @@
-#include "arm.hpp"
-#include "recomp.hpp"
 #include <ostream>
 #include <sstream>
 #include <tuple>
+
+#include <recompiler/recomp.hpp>
 
 namespace charm::recomp {
 
@@ -100,7 +100,7 @@ void Recompiler::analyze_reloc_plt() {
 
 			_funs_reloc[offset] = Function{
 			    .name = ss.str(),
-			    .address = static_cast<arm::addr_t>(offset),
+			    .address = (Word)offset,
 			    .is_external = true,
 			};
 			continue;
@@ -116,15 +116,13 @@ void Recompiler::analyze_reloc_plt() {
 
 		_funs_reloc[offset] = Function{
 		    .name = name,
-		    .address = value != 0
-		                   ? static_cast<arm::addr_t>(value) // virtual address
-		                   : static_cast<arm::addr_t>(offset), // .got offset
+		    .address = (Word)(value != 0 ? value    // virtual address
+		                                 : offset), // .got offset
 		    .is_external = !value,
 		};
 
-		_got_mappings.push_back(std::make_tuple(
-		    offset, value != 0 ? static_cast<arm::addr_t>(value)
-		                       : static_cast<arm::addr_t>(offset)));
+		_got_mappings.push_back(
+		    std::make_tuple(offset, (Word)(value != 0 ? value : offset)));
 	}
 
 	std::cout << "\tFound " << _funs_reloc.size() << " functions!" << std::endl;
@@ -155,7 +153,7 @@ void Recompiler::analyze_exported_functions() {
 
 		_funs_exports[value] = Function{
 		    .name = name, // TODO: multiple entries can have the same name!
-		    .address = static_cast<arm::addr_t>(value),
+		    .address = (Word)value,
 		    .is_external = false,
 		};
 	}
