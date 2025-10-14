@@ -1,4 +1,6 @@
 // PS: RIP clangd, i wish i didnt have to do .inls in year 2025...
+// (I have to use constexpr in order for instruction decoding to be done at
+// comptime)
 #pragma once
 
 namespace charm::isa::arm {
