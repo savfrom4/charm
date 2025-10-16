@@ -1,11 +1,12 @@
-#include "code.hpp"
-#include "data.hpp"
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
-using namespace layer;
+#include "code.hpp"
+
+#include <runtime/macros.hpp>
+#include <runtime/debug.hpp>
 
 #define EXPORT(name, address)                                                  \
 	__attribute__((weak)) void ExecutionState::name() {                          \

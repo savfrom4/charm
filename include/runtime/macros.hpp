@@ -6,72 +6,72 @@
 #define UNAFFECTED(x)
 
 #define EQ(x)                                                                  \
-	if (Z) {                                                                   \
+	if (cpu.Z) {                                                               \
 		x;                                                                     \
 	}
 
 #define NE(x)                                                                  \
-	if (!Z) {                                                                  \
+	if (!cpu.Z) {                                                              \
 		x;                                                                     \
 	}
 
 #define CS(x)                                                                  \
-	if (C) {                                                                   \
+	if (cpu.C) {                                                               \
 		x;                                                                     \
 	}
 
 #define CC(x)                                                                  \
-	if (!C) {                                                                  \
+	if (!cpu.C) {                                                              \
 		x;                                                                     \
 	}
 
 #define MI(x)                                                                  \
-	if (N) {                                                                   \
+	if (cpu.N) {                                                               \
 		x;                                                                     \
 	}
 
 #define PL(x)                                                                  \
-	if (!N) {                                                                  \
+	if (!cpu.N) {                                                              \
 		x;                                                                     \
 	}
 
 #define VS(x)                                                                  \
-	if (V) {                                                                   \
+	if (cpu.V) {                                                               \
 		x;                                                                     \
 	}
 
 #define VC(x)                                                                  \
-	if (!V) {                                                                  \
+	if (!cpu.V) {                                                              \
 		x;                                                                     \
 	}
 
 #define HI(x)                                                                  \
-	if (C && !Z) {                                                             \
+	if (cpu.C && !cpu.Z) {                                                     \
 		x;                                                                     \
 	}
 
 #define LS(x)                                                                  \
-	if (!C || Z) {                                                             \
+	if (!cpu.C || cpu.Z) {                                                     \
 		x;                                                                     \
 	}
 
 #define GE(x)                                                                  \
-	if (N == V) {                                                              \
+	if (cpu.N == cpu.V) {                                                      \
 		x;                                                                     \
 	}
 
 #define LT(x)                                                                  \
-	if (N != V) {                                                              \
+	if (cpu.N != cpu.V) {                                                      \
 		x;                                                                     \
 	}
 
 #define GT(x)                                                                  \
-	if (!Z && (N == V)) {                                                      \
+	if (!cpu.Z && (cpu.N == cpu.V)) {                                          \
 		x;                                                                     \
 	}
 
 #define LE(x)                                                                  \
-	if (Z || (N != V)) {                                                       \
+	if (cpu.Z || (cpu.N != cpu.V)) {                                           \
 		x;                                                                     \
 	}
 

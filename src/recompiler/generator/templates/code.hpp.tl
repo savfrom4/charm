@@ -7,17 +7,18 @@
 
 #define INSTR_RETURN_LR (0xFFFFFFFF)
 
+using namespace charm;
 using namespace charm::runtime;
 
 struct ExecutionState {
 	CPUState cpu;
 
-	Memory memory{
-	    .elf_size = /*% mem_elf_size %*/,
+	Memory memory{{
+	    .elf_size = /*% elf_total_size %*/,
 	    .heap_size = 64 * 1024 * 1024, // 64 MiB
 	    .heap_blk_size = 64,           // 64 bytes
 	    .stack_size = 4 * 1024 * 1024, // 4 MiB
-	};
+	}};
 
 	inline ExecutionState() {
 		const auto &config = memory.config();

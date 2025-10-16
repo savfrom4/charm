@@ -19,6 +19,7 @@ class CPUState {
 	bool N = false, /* negative */
 	    Z = false;  /* zero */
 
+	inline CPUState() {}
 	inline CPUState(const CPUState &) = delete;
 	inline CPUState &operator=(const CPUState &) = delete;
 

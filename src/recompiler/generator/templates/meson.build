@@ -1,4 +1,5 @@
 project('output', 'cpp', default_options: ['b_lto=true'])
+charm_proj = subproject('charm', default_options: ['runtime_only=true'])
 
 add_project_arguments('-Wno-unused-label', language: 'cpp')
 
@@ -6,19 +7,17 @@ if get_option('debugging')
   add_project_arguments('-DLAYER_DEBUG', language: 'cpp')
 endif
 
-include_directories: [
+include_directories = [
   'include',
 ]
 
 sources = files(
-  'src/armv4.cpp',
   'src/code.cpp',
   'src/data.cpp',
-  'src/debug.cpp',
-  'src/memory.cpp',
 )
 
-dependencies: [
+dependencies = [
+  charm_proj.get_variable('libruntime_dep'),
 ]
 
 if get_option('library')

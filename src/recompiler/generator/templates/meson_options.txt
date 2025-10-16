@@ -1,3 +1,2 @@
 option('debugging', type: 'boolean', value: false, description: 'Enable debugging via charm-dbg')
-
 option('library', type: 'boolean', value: true, description: 'Build as library')

@@ -46,12 +46,12 @@ void Recompiler::_emit_code_section(std::ostream &os,
 		isa::arm::Instruction instr{instr_raw};
 
 		// debug information for instruction debugging
-		if (!_minify) {
-			ss << "\t\t" << COND_TABLE[(int)instr.condition] << "(";
-			ss << "LAYER_DBE_SKIP(*this, \"%s\", \"0x" << std::hex << addr
-			   << ": ";
-			ss << instr.dump() << "\"));" << std::endl;
-		}
+		// if (!_minify) {
+		// 	ss << "\t\t" << COND_TABLE[(int)instr.condition] << "(";
+		// 	ss << "LAYER_DBE_SKIP(*this, \"%s\", \"0x" << std::hex << addr
+		// 	   << ": ";
+		// 	ss << instr.dump() << "\"));" << std::endl;
+		// }
 
 		// emit instruction impl
 		_emit_arm(ss, instr, addr);
@@ -137,7 +137,7 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		        "arm_ldr",
 		        "arm_str",
 		    },
-		    (int)data_trans.ld, instr.value);
+		    (int)data_trans.ld, instr.value, "memory");
 		break;
 	}
 
@@ -151,7 +151,7 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		        "arm_ldrh",
 		        "arm_strh",
 		    },
-		    (int)hw_data_trans.ld, instr.value);
+		    (int)hw_data_trans.ld, instr.value, "memory");
 		break;
 	}
 
@@ -165,7 +165,7 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		        "arm_ldm",
 		        "arm_stm",
 		    },
-		    (int)blk_data_trans.ld, instr.value);
+		    (int)blk_data_trans.ld, instr.value, "memory");
 		break;
 	}
 

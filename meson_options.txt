@@ -1,0 +1,1 @@
+option('runtime_only', type: 'boolean', value: false, description: 'Only build runtime')

@@ -21,17 +21,18 @@ void Recompiler::_step_emit(const std::string &output_dir) {
 
 	_emit_setup_project(output_dir);
 
+	std::cout << "> Data ..." << std::endl;
+	_emit_data_source(output_dir);
+
 	std::cout << "> Code ..." << std::endl;
 	_emit_code_header(output_dir);
 	_emit_code_source(output_dir);
-
-	std::cout << "> Data ..." << std::endl;
-	_emit_data_source(output_dir);
 }
 
 void Recompiler::_emit_setup_project(const std::filesystem::path &output_dir) {
 	auto output_include_dir = output_dir / "include";
 	auto output_src_dir = output_dir / "src";
+	auto output_subprojects = output_dir / "subprojects";
 
 	if (!std::filesystem::exists(output_include_dir)) {
 		std::filesystem::create_directory(output_include_dir);
@@ -41,7 +42,14 @@ void Recompiler::_emit_setup_project(const std::filesystem::path &output_dir) {
 		std::filesystem::create_directory(output_src_dir);
 	}
 
-	for (auto &file : std::filesystem::directory_iterator{"templates"}) {
+	if (!std::filesystem::exists(output_subprojects)) {
+		std::filesystem::create_directory(output_subprojects);
+		std::filesystem::create_symlink(std::filesystem::current_path() /
+		                                    "charm-src",
+		                                output_subprojects / "charm");
+	}
+
+	for (auto &file : std::filesystem::directory_iterator{"generator"}) {
 		const auto filename = file.path().filename().string();
 
 		// dont copy over templates
@@ -63,7 +71,9 @@ void Recompiler::_emit_code_header(const std::filesystem::path &output_dir) {
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_hpp_path);
 
-	Template tl{"code.hpp.tl"};
+	Template tl{"generator/code.hpp.tl"};
+
+	tl.format("elf_total_size", "%d", _elf_total_size);
 
 	// emit exported functions
 	tl.format("exported_functions", [&](std::stringstream &ss) {
@@ -96,7 +106,7 @@ void Recompiler::_emit_code_source(const std::filesystem::path &output_dir) {
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_cpp_path);
 
-	Template tl{"code.cpp.tl"};
+	Template tl{"generator/code.cpp.tl"};
 
 	tl.format("got_mappings", [&](std::stringstream &ss) {
 		for (auto &functions : _funs_reloc) {
@@ -133,7 +143,7 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_hpp_path);
 
-	Template tl{"data.cpp.tl"};
+	Template tl{"generator/data.cpp.tl"};
 
 	tl.format("data_arrays", [&](std::stringstream &ss) {
 		for (auto &section : _elf.sections) {
@@ -149,11 +159,11 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 
 			// for non-got table we just write raw bytes or 0es
 			if (section->get_name().find(".got") == std::string::npos) {
-				ss << utils::sformat("%s> %s_DATA = {",
+				ss << utils::sformat("%s, %d> %s_DATA = {",
 				                     ((section->get_flags() & ELFIO::SHF_WRITE)
-				                          ? "std::array<Byte, "
-				                          : "const std::array<Byte, "),
-				                     section->get_size() / sizeof(Word), name);
+				                          ? "std::array<Byte"
+				                          : "const std::array<Byte"),
+				                     section->get_size(), name);
 
 				ss << "\t";
 				for (auto i = 0; i < section->get_size(); i++) {
@@ -165,10 +175,10 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 					}
 				}
 			} else { // for got we map addresses that we know
-				ss << utils::sformat("%s> %s_DATA = {",
+				ss << utils::sformat("%s, %d> %s_DATA = {",
 				                     ((section->get_flags() & ELFIO::SHF_WRITE)
-				                          ? "std::array<Word, "
-				                          : "const std::array<Word, "),
+				                          ? "std::array<Word"
+				                          : "const std::array<Word"),
 				                     section->get_size() / sizeof(Word), name);
 
 				ss << std::hex;
@@ -198,6 +208,7 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 		}
 	});
 
+	_elf_total_size = 0;
 	tl.format("sections", [&](std::stringstream &ss) {
 		for (auto &section : _elf.sections) {
 			if (!_section_is_data(section.get())) {
@@ -211,6 +222,8 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 			          "\taccess.store(0x%X, %s_DATA.data(), %s_DATA.size());",
 			          (Word)section->get_address(), name, name)
 			   << std::endl;
+
+			_elf_total_size += section->get_size();
 		}
 	});
 

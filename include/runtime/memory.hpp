@@ -31,12 +31,14 @@ class MemoryAccessGuard : public std::lock_guard<std::mutex> {
 	MemoryAccessGuard &load(Word address, T buffer, Word size) {
 		static_assert(std::is_pointer_v<T>, "T must be a pointer!");
 		std::memcpy(buffer, _impl_access(address, false), size);
+		return *this;
 	}
 
 	template <typename T>
 	MemoryAccessGuard &store(Word address, T buffer, Word size) {
 		static_assert(std::is_pointer_v<T>, "T must be a pointer!");
 		std::memcpy(_impl_access(address, true), buffer, size);
+		return *this;
 	}
 
 	inline Word halloc(Word size) { return _impl_halloc(size); }

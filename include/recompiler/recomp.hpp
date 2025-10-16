@@ -46,9 +46,10 @@ class Recompiler {
 	/* Instruction level */
 
 	template <typename Array>
-	inline std::string _emit_arm_from_table(Array array, int index,
-	                                        Word value) {
-		return utils::sformat("cpu.%s(0x%X);", array[index], value);
+	inline std::string _emit_arm_from_table(Array array, int index, Word value,
+	                                        const std::string &arg = "") {
+		return utils::sformat("cpu.%s<isa::arm::Instruction(0x%X)>(%s);",
+		                      array[index], value, arg);
 	}
 
 	template <typename... Args>
@@ -75,6 +76,7 @@ class Recompiler {
 	bool _minify;
 	ELFIO::elfio _elf;
 	ELFIO::section *_text, *_relplt, *_reldyn, *_dynsym;
+	Word _elf_total_size = 0;
 
 	std::vector<std::tuple<Word, Word>> _got_mappings;
 	std::unordered_map<Word, Function> _funs_reloc;

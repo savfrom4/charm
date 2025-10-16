@@ -203,7 +203,7 @@ enum class InstructionGroup {
 };
 
 struct Instruction {
-	explicit constexpr Instruction(Word value);
+	constexpr Instruction(Word value);
 
 	Condition condition = Condition::NV;
 	Word value = 0xFFFFFFFF; // raw representation of the instruction
