@@ -1,8 +1,8 @@
 #pragma once
-#include "isa/arm.hpp"
 #include <array>
 
 #include <arch.hpp>
+#include <isa/arm.hpp>
 #include <runtime/memory.hpp>
 
 namespace charm::runtime {
@@ -57,8 +57,8 @@ class CPUState {
 	template <CRefInstr> void arm_stm(Memory &memory);
 
   private:
-	template <bool, Word, CRefShifter> Word value_or_shift();
-	template <CRefShifter> Word shift();
+	template <bool, Word, CRefShifter> Word _value_or_shift();
+	template <CRefShifter> Word _shift();
 };
 
 } // namespace charm::runtime

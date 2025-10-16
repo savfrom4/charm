@@ -46,7 +46,7 @@ std::string Instruction::dump() const {
 		                     REGISTER_TABLE[(int)data.rd],
 		                     REGISTER_TABLE[(int)data.rn]);
 
-		if (immediate) { // #imm
+		if (is_imm) { // #imm
 			ss << utils::sformat("#%" PRIu32, data.op2_imm);
 		} else { // rm
 			ss << REGISTER_TABLE[(int)data.op2_reg.rm];
@@ -101,7 +101,7 @@ std::string Instruction::dump() const {
 		const auto &data_trans = std::get<DataTransfer>(group);
 
 		// push/pop rd
-		if (immediate && data_trans.w && data_trans.rn == Register::SP &&
+		if (is_imm && data_trans.w && data_trans.rn == Register::SP &&
 		    data_trans.imm == 4 && data_trans.u == data_trans.ld) {
 			ss << utils::sformat("%s\t{%s}", data_trans.ld ? "pop" : "push",
 			                     REGISTER_TABLE[(int)data_trans.rd]);
@@ -119,7 +119,7 @@ std::string Instruction::dump() const {
 			ss << "]";
 		}
 
-		if (immediate) {
+		if (is_imm) {
 			//, #imm
 			ss << utils::sformat(", #%s%" PRIu16, data_trans.u ? "" : "-",
 			                     data_trans.imm);
@@ -170,7 +170,7 @@ std::string Instruction::dump() const {
 			ss << "]";
 		}
 
-		if (immediate) {
+		if (is_imm) {
 			//, #imm
 			ss << utils::sformat(", #%s%" PRIu8, hw_data_trans.u ? "" : "-",
 			                     hw_data_trans.imm);

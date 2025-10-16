@@ -6,17 +6,17 @@
 
 namespace charm::recomp {
 
-void Recompiler::step_analyze() {
-	analyze_reloc_dyn();
-	analyze_reloc_plt();
+void Recompiler::_step_analyze() {
+	_analyze_reloc_dyn();
+	_analyze_reloc_plt();
 
-	analyze_exported_functions();
+	_analyze_exported_functions();
 }
 
 // This step iterates trough .GOT table in the ELF binary and collects
 // symbols as well as their names. The entries are later used to build virtual
 // .GOT mappings.
-void Recompiler::analyze_reloc_dyn() {
+void Recompiler::_analyze_reloc_dyn() {
 	std::cout << "> Inspecting dyn relocation table ..." << std::endl;
 
 	if (!_reldyn) {
@@ -62,7 +62,7 @@ void Recompiler::analyze_reloc_dyn() {
 // means function is expected to be mapped by the linker (external). But, if it
 // has an address that most certanly means the function is included within the
 // binary (internal).
-void Recompiler::analyze_reloc_plt() {
+void Recompiler::_analyze_reloc_plt() {
 	std::cout << "> Inspecting the relocation table ..." << std::endl;
 
 	if (!_relplt) {
@@ -129,7 +129,7 @@ void Recompiler::analyze_reloc_plt() {
 }
 
 // This step collects all functions that executable "exports".
-void Recompiler::analyze_exported_functions() {
+void Recompiler::_analyze_exported_functions() {
 	std::cout << "> Inspecting exported functions ..." << std::endl;
 
 	ELFIO::symbol_section_accessor symbols(_elf, _dynsym);

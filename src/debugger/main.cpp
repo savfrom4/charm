@@ -1,3 +1,4 @@
+#include "arch.hpp"
 #include <array>
 #include <chrono>
 #include <cstring>
@@ -15,20 +16,14 @@
 #include <unistd.h>
 #include <vector>
 
-enum class DebugCommand : std::uint8_t {
-	NONE,
-	BREAK,            // set/remove breakpoint
-	NEXT,             // skip to next step (either instruction or internal)
-	SKIP,             // skip to next instruction
-	PAUSE_MODE,       // set pause mode (pause/continue)
-	PRINT_REGISTER,   // dump register
-	PRINT_AT_ADDRESS, // dump unsigned byte at addr n
-	DUMP,             // dump execution state
-	RESTORE,          // restore execution state
-	COUNT,
-};
+#include <debug/debug.hpp>
 
 const std::string VERSION = "1.0.0";
+
+namespace charm::debug {
+
+void debugger_execute_command(int connection, const std::string &full_command,
+                              bool &paused, std::array<char, 512> &temp_buffer);
 
 inline constexpr std::size_t hasher(const char *str, std::size_t hash = 5381) {
 	return *str
@@ -42,57 +37,14 @@ inline void buffer_write(std::array<char, 512> &buffer, std::uintptr_t &offset,
 	static_assert(std::is_enum_v<T> || std::is_integral_v<T>,
 	              "buffer_write: T must be an enum or an integer.");
 
-	if constexpr (sizeof(value) == sizeof(std::uint16_t)) {
+	if constexpr (sizeof(value) == sizeof(charm::Halfword)) {
 		value = htons(value);
-	} else if constexpr (sizeof(value) == sizeof(std::uint32_t)) {
+	} else if constexpr (sizeof(value) == sizeof(charm::Word)) {
 		value = htonl(value);
 	}
 
 	std::memcpy(buffer.data() + offset, &value, sizeof(value));
 	offset += sizeof(value);
-}
-
-void help_show();
-void debugger_start(struct addrinfo *info);
-void debugger_execute_command(int connection, const std::string &full_command,
-                              bool &paused, std::array<char, 512> &temp_buffer);
-bool debugger_network_process(int connection,
-                              std::array<char, 512> &temp_buffer,
-                              std::vector<char> &accum_buffer,
-                              std::uint32_t &length, bool &paused, int timeout);
-bool debugger_network_poll(int connection, int timeout);
-
-int main(int argc, char **argv) {
-	const std::string full_address = argc > 1 ? argv[1] : "127.0.0.1:6969";
-	const auto colon_location = full_address.find(':');
-
-	if (colon_location == std::string::npos) {
-		help_show();
-		return 1;
-	}
-
-	const std::string address = full_address.substr(0, colon_location);
-	const std::string port = full_address.substr(colon_location + 1);
-
-	std::cout << "> Connecting to \"" << address << "\", port " << port
-	          << " ..." << std::endl;
-
-	struct addrinfo hints, *info = nullptr;
-	std::memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-
-	if (getaddrinfo(address.c_str(), port.c_str(), &hints, &info) != 0) {
-		throw std::runtime_error("Failed to resolve specified address.");
-	}
-
-	if (!info) {
-		throw std::runtime_error("Failed to resolve specified address.");
-	}
-
-	debugger_start(info);
-	freeaddrinfo(info);
-	return 0;
 }
 
 void help_show() {
@@ -112,6 +64,89 @@ void help_show() {
 	          << std::endl
 	          << "\tcharm-dbg 127.0.0.1:6969 // connect to specified address"
 	          << std::endl;
+}
+
+bool debugger_network_poll(int connection, int timeout) {
+	struct pollfd fd = {
+	    .fd = connection,
+	    .events = POLLIN,
+	    .revents = 0,
+	};
+
+	int result = ::poll(&fd, 1, timeout);
+	if (result == 0) {
+		return false; /* nothing, still wait */
+	}
+
+	if (!result) {
+		throw std::runtime_error(
+		    "debugger_network_poll: invalid file descriptor "
+		    "(connection is lost...?).");
+	}
+
+	return (fd.revents & POLLIN);
+}
+
+bool debugger_network_process(int connection,
+                              std::array<char, 512> &temp_buffer,
+                              std::vector<char> &accum_buffer, Word &length,
+                              bool &paused, int timeout) {
+	auto temp_buffer_ptr = temp_buffer.data();
+
+	while (debugger_network_poll(connection, timeout)) {
+		ssize_t bytes_read =
+		    read(connection, temp_buffer_ptr, sizeof(temp_buffer));
+
+		if (!bytes_read) {
+			throw std::runtime_error(
+			    "debugger_network_process: connection is lost.");
+		}
+
+		accum_buffer.insert(accum_buffer.end(), temp_buffer_ptr,
+		                    temp_buffer_ptr + bytes_read);
+	}
+
+	// try to read as much as we can
+	bool result = false;
+	while (1) {
+		if (sizeof(Word) > accum_buffer.size()) {
+			break;
+		}
+
+		if (!length) {
+			std::memcpy(&length, accum_buffer.data(), sizeof(length));
+			accum_buffer.erase(accum_buffer.begin(),
+			                   accum_buffer.begin() + sizeof(length));
+
+			// length == 0: pause request
+			if (!length) {
+				paused = true;
+				result = true;
+				break;
+			}
+
+			length = ntohl(length);
+		}
+
+		if (length > accum_buffer.size()) {
+			break;
+		}
+
+		// read buffer
+		std::string buffer;
+		buffer.resize(length);
+		std::memcpy(buffer.data(), accum_buffer.data(), length);
+		accum_buffer.erase(accum_buffer.begin(), accum_buffer.begin() + length);
+
+		// reset length for later read
+		length = 0;
+		result = true;
+
+		std::cout << buffer << std::endl;
+		std::cout.flush();
+	}
+
+	return result;
 }
 
 void debugger_start(struct addrinfo *info) {
@@ -136,7 +171,7 @@ void debugger_start(struct addrinfo *info) {
 
 	std::array<char, 512> temp_buffer = {0};
 	std::vector<char> accum_buffer;
-	std::uint32_t length = 0;
+	Word length = 0;
 	bool paused = true;
 
 	while (1) {
@@ -200,16 +235,15 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 	case hasher("b"):
 	case hasher("break"): {
-		buffer_write(temp_buffer, buffer_offset, DebugCommand::BREAK);
-		buffer_write<std::uint32_t>(temp_buffer, buffer_offset,
-		                            std::stoul(arg, 0, 0));
+		buffer_write(temp_buffer, buffer_offset, Command::BREAK);
+		buffer_write<Word>(temp_buffer, buffer_offset, std::stoul(arg, 0, 0));
 		break;
 	}
 
 	case hasher("p"):
 	case hasher("print"): {
-		DebugCommand type = DebugCommand::PRINT_REGISTER;
-		std::uint32_t value = 0;
+		Command type = Command::PRINT_REGISTER;
+		Word value = 0;
 
 		switch (hasher(arg.c_str())) {
 		case hasher("r0"):
@@ -286,7 +320,7 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 		// address it is then
 		default: {
-			type = DebugCommand::PRINT_AT_ADDRESS;
+			type = Command::PRINT_AT_ADDRESS;
 			value = std::stoul(arg, 0, 0);
 			break;
 		}
@@ -299,22 +333,22 @@ void debugger_execute_command(int connection, const std::string &full_command,
 
 	case hasher("c"):
 	case hasher("continue"): {
-		buffer_write(temp_buffer, buffer_offset, DebugCommand::PAUSE_MODE);
-		buffer_write<std::uint8_t>(temp_buffer, buffer_offset, false);
+		buffer_write(temp_buffer, buffer_offset, Command::PAUSE_MODE);
+		buffer_write<Byte>(temp_buffer, buffer_offset, false);
 		paused = false;
 		break;
 	}
 
 	case hasher("n"):
 	case hasher("next"): {
-		buffer_write(temp_buffer, buffer_offset, DebugCommand::NEXT);
+		buffer_write(temp_buffer, buffer_offset, Command::NEXT);
 		paused = false;
 		break;
 	}
 
 	case hasher("s"):
 	case hasher("skip"): {
-		buffer_write(temp_buffer, buffer_offset, DebugCommand::SKIP);
+		buffer_write(temp_buffer, buffer_offset, Command::SKIP);
 		paused = false;
 		break;
 	}
@@ -346,86 +380,37 @@ void debugger_execute_command(int connection, const std::string &full_command,
 	}
 }
 
-bool debugger_network_process(int connection,
-                              std::array<char, 512> &temp_buffer,
-                              std::vector<char> &accum_buffer,
-                              std::uint32_t &length, bool &paused,
-                              int timeout) {
-	auto temp_buffer_ptr = temp_buffer.data();
+} // namespace charm::debug
 
-	while (debugger_network_poll(connection, timeout)) {
-		ssize_t bytes_read =
-		    read(connection, temp_buffer_ptr, sizeof(temp_buffer));
+int main(int argc, char **argv) {
+	const std::string full_address = argc > 1 ? argv[1] : "127.0.0.1:6969";
+	const auto colon_location = full_address.find(':');
 
-		if (!bytes_read) {
-			throw std::runtime_error(
-			    "debugger_network_process: connection is lost.");
-		}
-
-		accum_buffer.insert(accum_buffer.end(), temp_buffer_ptr,
-		                    temp_buffer_ptr + bytes_read);
+	if (colon_location == std::string::npos) {
+		charm::debug::help_show();
+		return 1;
 	}
 
-	// try to read as much as we can
-	bool result = false;
-	while (1) {
-		if (sizeof(std::uint32_t) > accum_buffer.size()) {
-			break;
-		}
+	const std::string address = full_address.substr(0, colon_location);
+	const std::string port = full_address.substr(colon_location + 1);
 
-		if (!length) {
-			std::memcpy(&length, accum_buffer.data(), sizeof(length));
-			accum_buffer.erase(accum_buffer.begin(),
-			                   accum_buffer.begin() + sizeof(length));
+	std::cout << "> Connecting to \"" << address << "\", port " << port
+	          << " ..." << std::endl;
 
-			// length == 0: pause request
-			if (!length) {
-				paused = true;
-				result = true;
-				break;
-			}
+	struct addrinfo hints, *info = nullptr;
+	std::memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
 
-			length = ntohl(length);
-		}
-
-		if (length > accum_buffer.size()) {
-			break;
-		}
-
-		// read buffer
-		std::string buffer;
-		buffer.resize(length);
-		std::memcpy(buffer.data(), accum_buffer.data(), length);
-		accum_buffer.erase(accum_buffer.begin(), accum_buffer.begin() + length);
-
-		// reset length for later read
-		length = 0;
-		result = true;
-
-		std::cout << buffer << std::endl;
-		std::cout.flush();
+	if (getaddrinfo(address.c_str(), port.c_str(), &hints, &info) != 0) {
+		throw std::runtime_error("Failed to resolve specified address.");
 	}
 
-	return result;
-}
-
-bool debugger_network_poll(int connection, int timeout) {
-	struct pollfd fd = {
-	    .fd = connection,
-	    .events = POLLIN,
-	    .revents = 0,
-	};
-
-	int result = ::poll(&fd, 1, timeout);
-	if (result == 0) {
-		return false; /* nothing, still wait */
+	if (!info) {
+		throw std::runtime_error("Failed to resolve specified address.");
 	}
 
-	if (!result) {
-		throw std::runtime_error(
-		    "debugger_network_poll: invalid file descriptor "
-		    "(connection is lost...?).");
-	}
-
-	return (fd.revents & POLLIN);
+	charm::debug::debugger_start(info);
+	freeaddrinfo(info);
+	return 0;
 }

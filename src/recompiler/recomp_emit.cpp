@@ -14,23 +14,23 @@
 
 namespace charm::recomp {
 
-void Recompiler::step_emit(const std::string &output_dir) {
+void Recompiler::_step_emit(const std::string &output_dir) {
 	if (!std::filesystem::exists(output_dir)) {
 		std::filesystem::create_directory(output_dir);
 	}
 
-	emit_setup_project(output_dir);
+	_emit_setup_project(output_dir);
 
 	std::cout << "> Code ..." << std::endl;
-	emit_code_header(output_dir);
-	emit_code_source(output_dir);
+	_emit_code_header(output_dir);
+	_emit_code_source(output_dir);
 
 	std::cout << "> Data ..." << std::endl;
-	emit_data_header(output_dir);
-	emit_data_source(output_dir);
+	_emit_data_header(output_dir);
+	_emit_data_source(output_dir);
 }
 
-void Recompiler::emit_setup_project(const std::filesystem::path &output_dir) {
+void Recompiler::_emit_setup_project(const std::filesystem::path &output_dir) {
 	auto output_include_dir = output_dir / "include";
 	auto output_src_dir = output_dir / "src";
 
@@ -42,27 +42,11 @@ void Recompiler::emit_setup_project(const std::filesystem::path &output_dir) {
 		std::filesystem::create_directory(output_src_dir);
 	}
 
-	for (auto &file : std::filesystem::directory_iterator{"generator"}) {
+	for (auto &file : std::filesystem::directory_iterator{"templates"}) {
 		const auto filename = file.path().filename().string();
 
 		// dont copy over templates
 		if (filename.find(".tl") != std::string::npos) {
-			continue;
-		}
-
-		// copy to include/
-		if (filename.find(".hpp") != std::string::npos) {
-			std::filesystem::copy_file(
-			    file, output_include_dir / filename,
-			    std::filesystem::copy_options::skip_existing);
-			continue;
-		}
-
-		// copy to src/
-		if (filename.find(".cpp") != std::string::npos) {
-			std::filesystem::copy_file(
-			    file, output_src_dir / filename,
-			    std::filesystem::copy_options::skip_existing);
 			continue;
 		}
 
@@ -73,20 +57,20 @@ void Recompiler::emit_setup_project(const std::filesystem::path &output_dir) {
 	}
 }
 
-void Recompiler::emit_code_header(const std::filesystem::path &output_dir) {
+void Recompiler::_emit_code_header(const std::filesystem::path &output_dir) {
 	const auto code_hpp_path = output_dir / "include" / "code.hpp";
 
 	std::ofstream ofs;
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_hpp_path);
 
-	Template tl{"generator/code.hpp.tl"};
+	Template tl{"code.hpp.tl"};
 
 	// emit exported functions
 	tl.format("exported_functions", [&](std::stringstream &ss) {
 		for (auto &functions : _funs_exports) {
 			ss << utils::sformat("\tvoid export_%s();",
-			                     symbol_name_map(functions.second.name))
+			                     _symbol_name_map(functions.second.name))
 			   << std::endl;
 		}
 	});
@@ -98,7 +82,7 @@ void Recompiler::emit_code_header(const std::filesystem::path &output_dir) {
 			}
 
 			ss << utils::sformat("\tvoid external_%s();",
-			                     symbol_name_map(functions.second.name))
+			                     _symbol_name_map(functions.second.name))
 			   << std::endl;
 		}
 	});
@@ -106,14 +90,14 @@ void Recompiler::emit_code_header(const std::filesystem::path &output_dir) {
 	ofs << tl.str();
 }
 
-void Recompiler::emit_code_source(const std::filesystem::path &output_dir) {
+void Recompiler::_emit_code_source(const std::filesystem::path &output_dir) {
 	const auto code_cpp_path = output_dir / "src" / "code.cpp";
 
 	std::ofstream ofs;
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_cpp_path);
 
-	Template tl{"generator/code.cpp.tl"};
+	Template tl{"code.cpp.tl"};
 
 	tl.format("got_mappings", [&](std::stringstream &ss) {
 		for (auto &functions : _funs_reloc) {
@@ -123,28 +107,28 @@ void Recompiler::emit_code_source(const std::filesystem::path &output_dir) {
 
 			ss << utils::sformat("INSTR(0x%X) { external_%s(); JUMP(r[LR]); }",
 			                     functions.second.address,
-			                     symbol_name_map(functions.second.name))
+			                     _symbol_name_map(functions.second.name))
 			   << std::endl;
 		}
 	});
 
 	tl.format("sections", [&](std::stringstream &ss) {
 		for (auto &section : _elf.sections) {
-			if (!section_is_code(section.get())) {
+			if (!_section_is_code(section.get())) {
 				continue;
 			}
 
-			emit_code_section(ss, section.get());
+			_emit_code_section(ss, section.get());
 		}
 	});
 
-	emit_code_address_mappings(tl);
-	emit_code_stubs(tl);
+	_emit_code_address_mappings(tl);
+	_emit_code_stubs(tl);
 
 	ofs << tl.str();
 }
 
-void Recompiler::emit_data_header(const std::filesystem::path &output_dir) {
+void Recompiler::_emit_data_header(const std::filesystem::path &output_dir) {
 	const auto code_hpp_path = output_dir / "include" / "data.hpp";
 
 	std::ofstream ofs;
@@ -156,11 +140,11 @@ void Recompiler::emit_data_header(const std::filesystem::path &output_dir) {
 	ofs << "#include <cstdint>" << std::endl << std::endl;
 
 	for (auto &section : _elf.sections) {
-		if (!section_is_data(section.get())) {
+		if (!_section_is_data(section.get())) {
 			continue;
 		}
 
-		auto name = symbol_name_map(section->get_name());
+		auto name = _symbol_name_map(section->get_name());
 		std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
 		auto data_type = "std::uint8_t";
@@ -185,7 +169,7 @@ void Recompiler::emit_data_header(const std::filesystem::path &output_dir) {
 	}
 }
 
-void Recompiler::emit_data_source(const std::filesystem::path &output_dir) {
+void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 	const auto code_hpp_path = output_dir / "src" / "data.cpp";
 
 	std::ofstream ofs;
@@ -259,14 +243,14 @@ void Recompiler::emit_data_source(const std::filesystem::path &output_dir) {
 	// }
 }
 
-void Recompiler::emit_code_address_mappings(Template &tl) {
+void Recompiler::_emit_code_address_mappings(Template &tl) {
 	tl.format("address_map", [&](std::stringstream &ss) {
 		for (auto &section : _elf.sections) {
-			if (!section_is_data(section.get())) {
+			if (!_section_is_data(section.get())) {
 				continue;
 			}
 
-			auto name = symbol_name_map(section->get_name());
+			auto name = _symbol_name_map(section->get_name());
 			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
 			ss << utils::sformat("\tif(address >= "
@@ -292,11 +276,11 @@ void Recompiler::emit_code_address_mappings(Template &tl) {
 
 	tl.format("address_resolve", [&](std::stringstream &ss) {
 		for (auto &section : _elf.sections) {
-			if (!section_is_data(section.get())) {
+			if (!_section_is_data(section.get())) {
 				continue;
 			}
 
-			auto name = symbol_name_map(section->get_name());
+			auto name = _symbol_name_map(section->get_name());
 			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
 			ss << utils::sformat("\tif(address >= 0x%X && address < 0x%X) {",
@@ -316,11 +300,11 @@ void Recompiler::emit_code_address_mappings(Template &tl) {
 	});
 }
 
-void Recompiler::emit_code_stubs(Template &tl) {
+void Recompiler::_emit_code_stubs(Template &tl) {
 	tl.format("exported_functions", [&](std::stringstream &ss) {
 		for (auto &functions : _funs_exports) {
 			ss << utils::sformat("EXPORT(export_%s, 0x%X);",
-			                     symbol_name_map(functions.second.name),
+			                     _symbol_name_map(functions.second.name),
 			                     functions.second.address)
 			   << std::endl;
 		}
@@ -333,13 +317,13 @@ void Recompiler::emit_code_stubs(Template &tl) {
 			}
 
 			ss << utils::sformat("STUB(external_%s);",
-			                     symbol_name_map(functions.second.name))
+			                     _symbol_name_map(functions.second.name))
 			   << std::endl;
 		}
 	});
 }
 
-std::string Recompiler::symbol_name_map(const std::string &symbol) {
+std::string Recompiler::_symbol_name_map(const std::string &symbol) {
 	std::string s;
 
 	for (auto &ch : symbol) {
@@ -358,7 +342,7 @@ std::string Recompiler::symbol_name_map(const std::string &symbol) {
 	return s;
 }
 
-bool Recompiler::section_is_data(const ELFIO::section *section) {
+bool Recompiler::_section_is_data(const ELFIO::section *section) {
 	if (!section) {
 		return false;
 	}
@@ -385,7 +369,7 @@ bool Recompiler::section_is_data(const ELFIO::section *section) {
 	return true;
 }
 
-bool Recompiler::section_is_code(const ELFIO::section *section) {
+bool Recompiler::_section_is_code(const ELFIO::section *section) {
 	if (!section) {
 		return false;
 	}

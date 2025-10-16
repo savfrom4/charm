@@ -6,7 +6,7 @@
 
 #include <isa/arm.hpp>
 #include <runtime/cpu.hpp>
-#include <runtime/helpers.hpp>
+#include <runtime/macros.hpp>
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #warning "Untested on big-endian systems, expect problems!"
@@ -15,11 +15,11 @@
 namespace charm::runtime {
 
 template <bool is_imm, Word value, CPUState::CRefShifter shifter>
-Word CPUState::value_or_shift() {
-	return is_imm ? value : shift<shifter>();
+Word CPUState::_value_or_shift() {
+	return is_imm ? value : _shift<shifter>();
 }
 
-template <CPUState::CRefShifter shifter> Word CPUState::shift() {
+template <CPUState::CRefShifter shifter> Word CPUState::_shift() {
 	Word value = r[shifter.rm];
 	Word amount =
 	    shifter.is_reg ? r[shifter.amount_or_rs] : shifter.amount_or_rs;
@@ -94,7 +94,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_add() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -115,7 +115,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_adc() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -137,7 +137,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_sub() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -158,7 +158,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_sbc() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -180,7 +180,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_cmp() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -199,7 +199,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mov() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -219,7 +219,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_rsb() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -240,7 +240,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_rsc() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -263,7 +263,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_and() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -283,7 +283,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_eor() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -303,7 +303,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_orr() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -322,7 +322,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_bic() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -341,7 +341,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mvn() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -361,7 +361,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_tst() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -380,7 +380,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_teq() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -399,7 +399,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_cmn() {
 	constexpr const auto &data =
 	    std::get<isa::arm::DataProcessing>(instr.group);
 	const Word value =
-	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -532,7 +532,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_ldr(Memory &memory) {
 
 	const Word base = r[data_trans.rn];
 	const Word offset =
-	    value_or_shift<instr.is_imm, data_trans.imm, data_trans.reg>();
+	    _value_or_shift<instr.is_imm, data_trans.imm, data_trans.reg>();
 	const Word address =
 	    data_trans.p ? base + (data_trans.u ? offset : -offset) : base;
 
@@ -563,7 +563,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_str(Memory &memory) {
 	Word value = r[data_trans.rd];
 
 	const Word offset =
-	    value_or_shift<instr.is_imm, data_trans.imm, data_trans.reg>();
+	    _value_or_shift<instr.is_imm, data_trans.imm, data_trans.reg>();
 	const Word address =
 	    data_trans.p ? base + (data_trans.u ? offset : -offset) : base;
 

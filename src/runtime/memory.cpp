@@ -1,10 +1,11 @@
+#include "arch.hpp"
 #include <runtime/memory.hpp>
 
 namespace charm::runtime {
 
 struct HeapBlock {
 	bool allocated;
-	std::uint32_t size;
+	Word size;
 };
 
 Memory::Memory(MemoryConfig config) : _config(config) {
@@ -37,8 +38,8 @@ Word MemoryAccessGuard::_impl_halloc(Word size) {
 	size = (size + 3) & ~3; // word-align
 
 	// we iterate trying to find a free block
-	std::uint8_t *ptr = _memory._data.data() + _memory._config.heap_base;
-	const std::uint8_t *end = ptr + _memory._config.heap_size;
+	Byte *ptr = _memory._data.data() + _memory._config.heap_base;
+	const Byte *end = ptr + _memory._config.heap_size;
 
 	while (ptr < end) {
 		HeapBlock blk;
@@ -56,7 +57,7 @@ Word MemoryAccessGuard::_impl_halloc(Word size) {
 
 			// if its more than block sizes, split the block in two
 			if (diff >= _memory._config.heap_blk_size) {
-				uint8_t *next_blk_ptr = ptr + diff + sizeof(HeapBlock);
+				Byte *next_blk_ptr = ptr + diff + sizeof(HeapBlock);
 				const HeapBlock next_blk = {
 				    .allocated = false,
 				    .size = static_cast<Word>(diff),
@@ -72,7 +73,7 @@ Word MemoryAccessGuard::_impl_halloc(Word size) {
 		}
 
 		// dont give up yet, try to combine multiple blocks
-		std::uint8_t *next_blk_ptr = ptr + blk.size + sizeof(HeapBlock);
+		Byte *next_blk_ptr = ptr + blk.size + sizeof(HeapBlock);
 		Word accumulated_size = blk.size, n = 0;
 		bool found = false;
 
@@ -111,9 +112,8 @@ Word MemoryAccessGuard::_impl_halloc(Word size) {
 }
 
 void MemoryAccessGuard::_impl_hfree(Word address) {
-	std::uint8_t *base =
-	    reinterpret_cast<std::uint8_t *>(_impl_access(address, true)) -
-	    sizeof(HeapBlock);
+	Byte *base = reinterpret_cast<Byte *>(_impl_access(address, true)) -
+	             sizeof(HeapBlock);
 
 	HeapBlock blk;
 	std::memcpy(&blk, base, sizeof(blk));

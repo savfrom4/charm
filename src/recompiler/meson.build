@@ -1,7 +1,5 @@
 fs = import('fs')
 
-subdir('generator')
-
 executable(
   'recompiler',
 
@@ -21,6 +19,8 @@ executable(
 template_sources = [
   'templates/code.hpp.tl',
   'templates/code.cpp.tl',
+  'templates/meson.build',
+  'templates/meson_options.txt',
 ]
 
 foreach f : template_sources

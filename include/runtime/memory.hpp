@@ -1,10 +1,11 @@
 #pragma once
-#include <arch.hpp>
 #include <cstdint>
 #include <cstring>
 #include <mutex>
 #include <type_traits>
 #include <vector>
+
+#include <arch.hpp>
 
 namespace charm::runtime {
 

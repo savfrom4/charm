@@ -1,5 +1,5 @@
-#include "debug.hpp"
-#include "state.hpp"
+#include "arch.hpp"
+#include "runtime/memory.hpp"
 #include <arpa/inet.h>
 #include <cstddef>
 #include <cstdio>
@@ -8,15 +8,19 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
-#include <stdexcept>
-#include <string>
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <debug/debug.hpp>
+#include <runtime/cpu.hpp>
+#include <runtime/debug.hpp>
+
+namespace charm::runtime {
+
 // NOTE: excludes 1 byte header
-const std::array<size_t, (int)layer::DebugCommand::COUNT> COMMAND_SIZE_TABLE = {
+const std::array<size_t, (int)debug::Command::COUNT> COMMAND_SIZE_TABLE = {
     0,
     sizeof(std::uint32_t), // BREAK (32-bit imm address)
     0,                     // STEP
@@ -30,9 +34,7 @@ const std::array<size_t, (int)layer::DebugCommand::COUNT> COMMAND_SIZE_TABLE = {
                            // string)
 };
 
-namespace layer {
-
-Debugee::Debugee(CPUState &_ps) : _ps(_ps) {
+Debugee::Debugee(CPUState &_ps, Memory &memory) : _cpu(_ps), _memory(memory) {
 	_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (_socket < 0) {
 		throw std::runtime_error(
@@ -41,7 +43,7 @@ Debugee::Debugee(CPUState &_ps) : _ps(_ps) {
 
 	struct sockaddr_in address = {
 	    .sin_family = AF_INET,
-	    .sin_port = htons(LAYER_DEBUG_PORT),
+	    .sin_port = htons(CHARM_DEBUG_PORT),
 	    .sin_addr = {.s_addr = INADDR_ANY},
 	    .sin_zero = {0},
 	};
@@ -51,7 +53,7 @@ Debugee::Debugee(CPUState &_ps) : _ps(_ps) {
 		    "ExecutionDebugee ctor: failed to bind socket.");
 	}
 
-	std::cout << "> Waitng for debugger on port " << LAYER_DEBUG_PORT << "..."
+	std::cout << "> Waitng for debugger on port " << CHARM_DEBUG_PORT << "..."
 	          << std::endl;
 
 	if (listen(_socket, 1) < 0) {
@@ -77,13 +79,13 @@ Debugee::Debugee(CPUState &_ps) : _ps(_ps) {
 	std::cout << "> Connection established!" << std::endl;
 
 	send_format("Waiting for user input...");
-	stall();
+	_stall();
 }
 
 Debugee::~Debugee() {
 	send_format("Reached program's end. Continuing will close the connection.");
 	send_paused();
-	stall();
+	_stall();
 
 	if (_socket >= 0) {
 		close(_socket);
@@ -102,11 +104,11 @@ void Debugee::next() {
 		send_paused();
 	}
 
-	stall();
+	_stall();
 }
 
 void Debugee::skip() {
-	bool is_breakpoint = _breakpoints.count(_ps.r[PC] - 8);
+	bool is_breakpoint = _breakpoints.count(_cpu.r[PC] - 8);
 
 	if (is_breakpoint || flags & SKIP) {
 		flags &= ~SKIP; // clear flag
@@ -123,7 +125,7 @@ void Debugee::skip() {
 		send_paused();
 	}
 
-	stall();
+	_stall();
 }
 
 void Debugee::send_paused() {
@@ -132,7 +134,7 @@ void Debugee::send_paused() {
 	std::uint32_t length = 0; // sending length 0 is pause request
 	write(_connection, &length, sizeof(length));
 
-	stall();
+	_stall();
 }
 
 void Debugee::send_message() {
@@ -148,7 +150,7 @@ void Debugee::send_message() {
 	write(_connection, temp_buffer_ptr, length + sizeof(length));
 }
 
-bool Debugee::poll(int timeout) {
+bool Debugee::_poll(int timeout) {
 	struct pollfd fd = {
 	    .fd = _connection,
 	    .events = POLLIN,
@@ -168,10 +170,10 @@ bool Debugee::poll(int timeout) {
 	return (fd.revents & POLLIN);
 }
 
-void Debugee::process(int timeout) {
+void Debugee::_process(int timeout) {
 	auto temp_buffer_ptr = _temp_buffer.data();
 
-	while (poll(timeout)) {
+	while (_poll(timeout)) {
 		ssize_t bytes_read =
 		    ::read(_connection, temp_buffer_ptr, sizeof(_temp_buffer));
 
@@ -190,7 +192,7 @@ void Debugee::process(int timeout) {
 		}
 
 		// read command type
-		if (_command == DebugCommand::NONE) {
+		if (_command == debug::Command::NONE) {
 			std::memcpy(&_command, _accum_buffer.data(), sizeof(_command));
 			_accum_buffer.erase(_accum_buffer.begin());
 		}
@@ -206,18 +208,18 @@ void Debugee::process(int timeout) {
 			return;
 		}
 
-		process_command();
+		_process_command();
 
 		_accum_buffer.erase(_accum_buffer.begin(),
 		                    _accum_buffer.begin() + command_size);
-		_command = DebugCommand::NONE;
+		_command = debug::Command::NONE;
 	}
 }
 
-void Debugee::process_command() {
+void Debugee::_process_command() {
 	switch (_command) {
-	case DebugCommand::BREAK: {
-		std::uint32_t value;
+	case debug::Command::BREAK: {
+		Word value;
 		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 		value = ntohl(value);
 
@@ -232,20 +234,20 @@ void Debugee::process_command() {
 		break;
 	}
 
-	case DebugCommand::NEXT: {
+	case debug::Command::NEXT: {
 		flags |= NEXT;
 		flags &= ~PAUSED;
 		break;
 	}
 
-	case layer::DebugCommand::SKIP: {
+	case debug::Command::SKIP: {
 		flags |= SKIP;
 		flags &= ~PAUSED;
 		break;
 	}
 
-	case DebugCommand::PAUSE_MODE: {
-		std::uint8_t value;
+	case debug::Command::PAUSE_MODE: {
+		Byte value;
 		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 
 		if (value) {
@@ -256,28 +258,29 @@ void Debugee::process_command() {
 		break;
 	}
 
-	case DebugCommand::PRINT_REGISTER: {
-		std::uint32_t value;
+	case debug::Command::PRINT_REGISTER: {
+		Word value;
 		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
 		value = ntohl(value);
 
-		send_format("r%d=0x%X (%u)", value, _ps.r[value], _ps.r[value]);
+		send_format("r%d=0x%X (%u)", value, _cpu.r[value], _cpu.r[value]);
 		break;
 	}
 
-	case DebugCommand::PRINT_AT_ADDRESS: {
-		std::uint32_t value;
-		std::memcpy(&value, _accum_buffer.data(), sizeof(value));
-		value = ntohl(value);
+	case debug::Command::PRINT_AT_ADDRESS: {
+		Word address;
+		std::memcpy(&address, _accum_buffer.data(), sizeof(address));
+		address = ntohl(address);
 
-		const std::uint8_t *ptr =
-		    _ps.address_resolve<const std::uint8_t *>(value);
-		send_format("0x%X=0x%X (%u)", value, *ptr, *ptr);
+		Byte value;
+		_memory.access().load(address, &value, sizeof(value));
+
+		send_format("0x%X=0x%X (%u)", address, value, value);
 		break;
 	}
 
-	case DebugCommand::DUMP:
-	case DebugCommand::RESTORE:
+	case debug::Command::DUMP:
+	case debug::Command::RESTORE:
 		break;
 
 	default:
@@ -286,8 +289,8 @@ void Debugee::process_command() {
 	}
 }
 
-void Debugee::stall() {
+void Debugee::_stall() {
 	while (flags & PAUSED)
-		process(30); // wait for continue
+		_process(30); // wait for continue
 }
-} // namespace layer
+} // namespace charm::runtime

@@ -23,52 +23,56 @@ class Recompiler {
 	void emit(const std::string &output_dir);
 
   private:
-	void step_analyze();
-	void step_emit(const std::string &output_dir);
+	void _step_analyze();
+	void _step_emit(const std::string &output_dir);
 
-	void analyze_reloc_plt();
-	void analyze_reloc_dyn();
-	void analyze_exported_functions();
+	void _analyze_reloc_plt();
+	void _analyze_reloc_dyn();
+	void _analyze_exported_functions();
 
-	void emit_setup_project(const std::filesystem::path &output_dir);
+	void _emit_setup_project(const std::filesystem::path &output_dir);
 
 	/* Code level */
 
-	void emit_data_header(const std::filesystem::path &output_dir);
-	void emit_data_source(const std::filesystem::path &output_dir);
-	void emit_code_source(const std::filesystem::path &output_dir);
-	void emit_code_header(const std::filesystem::path &output_dir);
+	void _emit_data_header(const std::filesystem::path &output_dir);
+	void _emit_data_source(const std::filesystem::path &output_dir);
+	void _emit_code_source(const std::filesystem::path &output_dir);
+	void _emit_code_header(const std::filesystem::path &output_dir);
 
 	/* Section level */
 
-	void emit_code_address_mappings(Template &tl);
-	void emit_code_stubs(Template &tl);
-	void emit_code_section(std::ostream &os, const ELFIO::section *section);
+	void _emit_code_address_mappings(Template &tl);
+	void _emit_code_stubs(Template &tl);
+	void _emit_code_section(std::ostream &os, const ELFIO::section *section);
 
 	/* Instruction level */
 
-	void emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
-	              Word address);
-
-	// checks if instruction modifies pc
-	void emit_arm_modifies_pc(std::ostream &os,
-	                          const isa::arm::Instruction &instr, Word address);
+	template <typename Array>
+	inline std::string _emit_arm_from_table(Array array, int index,
+	                                        Word value) {
+		return utils::sformat("%s(0x%X);", array[index], value);
+	}
 
 	template <typename... Args>
-	void emit_arm_invalid(std::ostream &os, const isa::arm::Instruction &&instr,
-	                      Word address, const char *fmt, Args... args) {
-		char buffer[512] = {0};
-		snprintf(buffer, 512, fmt, args...);
-
-		os << std::hex << "throw std::runtime_error(\"" << buffer
-		   << " (addr = 0x" << address << ", raw=0x" << instr.value << ")\")";
+	inline std::string _emit_arm_invalid(Word address, Word value,
+	                                     const std::string &fmt, Args... args) {
+		return utils::sformat(
+		    "throw std::runtime_error(\"%s (addr=0x%X, raw=0x%X)\");",
+		    utils::sformat(fmt, args...), address, value);
 	}
+
+	void _emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
+	               Word address);
+
+	void _emit_arm_modifies_pc(std::ostream &os,
+	                           const isa::arm::Instruction &instr,
+	                           Word address);
 
 	/* Utils */
 
-	std::string symbol_name_map(const std::string &symbol);
-	bool section_is_data(const ELFIO::section *section);
-	bool section_is_code(const ELFIO::section *section);
+	std::string _symbol_name_map(const std::string &symbol);
+	bool _section_is_data(const ELFIO::section *section);
+	bool _section_is_code(const ELFIO::section *section);
 
 	bool _minify;
 	ELFIO::elfio _elf;

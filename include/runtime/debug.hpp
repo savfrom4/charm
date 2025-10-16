@@ -6,23 +6,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include <debug/debug.hpp>
+#include <runtime/cpu.hpp>
+#include <runtime/memory.hpp>
+
 namespace charm::runtime {
-
-class CPUState;
-
-// NOTE: see .cpp file for sizes
-enum class DebugCommand : std::uint8_t {
-	NONE,
-	BREAK,            // set/remove breakpoint
-	NEXT,             // skip to next step (either instruction or internal)
-	SKIP,             // skip to next instruction
-	PAUSE_MODE,       // set pause mode (pause/continue)
-	PRINT_REGISTER,   // dump register
-	PRINT_AT_ADDRESS, // dump unsigned byte at addr n
-	DUMP,             // dump execution state
-	RESTORE,          // restore execution state
-	COUNT,
-};
 
 // debugee is a tcp listener that's used by charm-dbg
 class Debugee {
@@ -35,7 +23,7 @@ class Debugee {
 	};
 	std::uint32_t flags = PAUSED;
 
-	Debugee(CPUState &ps);
+	Debugee(CPUState &ps, Memory &memory);
 	~Debugee();
 
 	// these two functions are called either each instruction or inside
@@ -61,10 +49,13 @@ class Debugee {
 	void send_paused();
 
   private:
-	CPUState &_ps;
+	CPUState &_cpu;
+	Memory &_memory;
+
 	int _socket = -1, _connection = -1;
-	DebugCommand _command =
-	    DebugCommand::NONE; /* current command (to index into size array) */
+	debug::Command _command =
+	    debug::Command::NONE; /* current command (to index into size array)
+	                                */
 
 	std::unordered_set<std::uint32_t> _breakpoints;
 
@@ -73,10 +64,10 @@ class Debugee {
 	    snpritnf, etc... */
 	std::vector<char> _accum_buffer; /* fill with data, then read packet */
 
-	void stall();
-	bool poll(int timeout);
-	void process(int timeout);
-	void process_command();
+	void _stall();
+	bool _poll(int timeout);
+	void _process(int timeout);
+	void _process_command();
 };
 
 } // namespace charm::runtime
