@@ -34,14 +34,12 @@ class Recompiler {
 
 	/* Code level */
 
-	void _emit_data_header(const std::filesystem::path &output_dir);
 	void _emit_data_source(const std::filesystem::path &output_dir);
 	void _emit_code_source(const std::filesystem::path &output_dir);
 	void _emit_code_header(const std::filesystem::path &output_dir);
 
 	/* Section level */
 
-	void _emit_code_address_mappings(Template &tl);
 	void _emit_code_stubs(Template &tl);
 	void _emit_code_section(std::ostream &os, const ELFIO::section *section);
 
@@ -50,7 +48,7 @@ class Recompiler {
 	template <typename Array>
 	inline std::string _emit_arm_from_table(Array array, int index,
 	                                        Word value) {
-		return utils::sformat("%s(0x%X);", array[index], value);
+		return utils::sformat("cpu.%s(0x%X);", array[index], value);
 	}
 
 	template <typename... Args>

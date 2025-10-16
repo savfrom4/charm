@@ -1,15 +1,33 @@
 #pragma once
 #include <cstdint>
-#include <liblayer/liblayer.hpp>
+
+#include <arch.hpp>
+#include <runtime/cpu.hpp>
+#include <runtime/memory.hpp>
+
 #define INSTR_RETURN_LR (0xFFFFFFFF)
 
-class ProgramState : public layer::ExecutionState {
-  public:
-	/* ADDRESS MAPPING */
-	std::uint32_t address_map_raw(std::uintptr_t address) override;
-	std::uintptr_t address_resolve_raw(std::uint32_t address) override;
+using namespace charm::runtime;
 
-	void eval(std::uint32_t address);
+struct ExecutionState {
+	CPUState cpu;
+
+	Memory memory{
+	    .elf_size = /*<% mem_elf_size %>*/,
+	    .heap_size = 64 * 1024 * 1024, // 64 MiB
+	    .heap_blk_size = 64,           // 64 bytes
+	    .stack_size = 4 * 1024 * 1024, // 4 MiB
+	};
+
+	inline ExecutionState() {
+		const auto &config = memory.config();
+		cpu.r[SP] = memory.stack_base() + config.stack_size;
+
+		init_elf_sections();
+	}
+
+	void init_elf_sections();
+	void eval(Word address);
 
 	// clang-format off
 

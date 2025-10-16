@@ -55,7 +55,7 @@ class Debugee {
 	int _socket = -1, _connection = -1;
 	debug::Command _command =
 	    debug::Command::NONE; /* current command (to index into size array)
-	                                */
+	                           */
 
 	std::unordered_set<std::uint32_t> _breakpoints;
 

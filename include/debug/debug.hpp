@@ -1,5 +1,6 @@
 #pragma once
 #include <arch.hpp>
+#include <array>
 #define CHARM_DEBUG_PORT (22869)
 
 namespace charm::debug {
@@ -17,4 +18,19 @@ enum class Command : Byte {
 	COUNT,
 };
 
-}
+// NOTE: excludes 1 byte header
+inline const std::array<Word, (int)debug::Command::COUNT> COMMAND_SIZE_TABLE = {
+    0,
+    sizeof(Word), // BREAK (32-bit imm address)
+    0,            // STEP
+    0,            // SKIP
+    sizeof(Byte), // PAUSE_MODE (8-bit boolean)
+    sizeof(Word), // PRINT_REGISTER (8-bit register index)
+    sizeof(Word), // PRINT_AT_ADDRESS (32-bit imm address)
+    sizeof(Word), // DUMP (32-bit imm filename length + n bytes of
+                  // string)
+    sizeof(Word), // RESTORE (32-bit imm filename length + n bytes of
+                  // string)
+};
+
+} // namespace charm::debug

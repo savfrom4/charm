@@ -12,9 +12,9 @@ namespace charm::runtime {
 class Memory;
 
 struct MemoryConfig {
-	Word total_size;
-	Word heap_base, heap_size, heap_blk_size;
-	Word stack_base, stack_size;
+	Word elf_size;                 /* ELF sections  */
+	Word heap_size, heap_blk_size; /* Heap */
+	Word stack_size;               /* Stack */
 };
 
 class MemoryAccessGuard : public std::lock_guard<std::mutex> {
@@ -58,10 +58,17 @@ class Memory {
 		return MemoryAccessGuard{_mutex, *this};
 	}
 
+	inline const MemoryConfig &config() const { return _config; }
+	inline Word heap_base() const { return _heap_base; }
+	inline Word stack_base() const { return _stack_base; }
+	inline Word total_size() const { return _data.size(); }
+
   private:
 	friend class MemoryAccessGuard;
 
 	MemoryConfig _config;
+
+	Word _heap_base, _stack_base;
 	std::vector<std::uint8_t> _data;
 	std::mutex _mutex;
 };

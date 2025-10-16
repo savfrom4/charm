@@ -197,7 +197,7 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		}
 
 		if (branch.link) {
-			os << "ps.r[LR] = 0x" << std::hex << address + 4 << std::dec
+			os << "cpu.r[LR] = 0x" << std::hex << address + 4 << std::dec
 			   << "; ";
 			os << "address = " << std::hex << "0x" << final_offset
 			   << "; goto __start__; " << MINIFY_COMMENT("/* bl */");
@@ -210,7 +210,7 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 
 	case isa::arm::InstructionGroup::BRANCH_EXCHANGE: {
 		const auto &branchex = std::get<isa::arm::BranchEx>(instr.group);
-		os << "address = " << std::hex << "ps.r["
+		os << "address = " << std::hex << "cpu.r["
 		   << REGISTER_TABLE[(int)branchex.rm] << "]; goto __start__; "
 		   << MINIFY_COMMENT("/* bx */");
 		break;

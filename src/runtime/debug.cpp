@@ -1,8 +1,6 @@
 #include "arch.hpp"
 #include "runtime/memory.hpp"
 #include <arpa/inet.h>
-#include <cstddef>
-#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
@@ -18,21 +16,6 @@
 #include <runtime/debug.hpp>
 
 namespace charm::runtime {
-
-// NOTE: excludes 1 byte header
-const std::array<size_t, (int)debug::Command::COUNT> COMMAND_SIZE_TABLE = {
-    0,
-    sizeof(std::uint32_t), // BREAK (32-bit imm address)
-    0,                     // STEP
-    0,                     // SKIP
-    sizeof(std::uint8_t),  // PAUSE_MODE (8-bit boolean)
-    sizeof(std::uint32_t), // PRINT_REGISTER (8-bit register index)
-    sizeof(std::uint32_t), // PRINT_AT_ADDRESS (32-bit imm address)
-    sizeof(std::uint32_t), // DUMP (32-bit imm filename length + n bytes of
-                           // string)
-    sizeof(std::uint32_t), // RESTORE (32-bit imm filename length + n bytes of
-                           // string)
-};
 
 Debugee::Debugee(CPUState &_ps, Memory &memory) : _cpu(_ps), _memory(memory) {
 	_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -197,13 +180,13 @@ void Debugee::_process(int timeout) {
 			_accum_buffer.erase(_accum_buffer.begin());
 		}
 
-		if ((int)_command >= COMMAND_SIZE_TABLE.size()) {
+		if ((int)_command >= debug::COMMAND_SIZE_TABLE.size()) {
 			throw std::runtime_error("Debugee:process: invalid command type: " +
 			                         std::to_string((int)_command));
 		}
 
 		// not enough data
-		const auto command_size = COMMAND_SIZE_TABLE[(int)_command];
+		const auto command_size = debug::COMMAND_SIZE_TABLE[(int)_command];
 		if (_accum_buffer.size() < command_size) {
 			return;
 		}

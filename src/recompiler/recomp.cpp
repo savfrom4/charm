@@ -36,6 +36,7 @@ Recompiler::Recompiler(const std::string &elf_exe, bool minify) {
 		_reldyn = _elf.sections[".rela.dyn"];
 
 	_dynsym = _elf.sections[".dynsym"];
+	_minify = minify;
 }
 
 void Recompiler::emit(const std::string &output_dir) {
