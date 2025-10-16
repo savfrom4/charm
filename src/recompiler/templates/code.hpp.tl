@@ -13,7 +13,7 @@ struct ExecutionState {
 	CPUState cpu;
 
 	Memory memory{
-	    .elf_size = /*<% mem_elf_size %>*/,
+	    .elf_size = /*% mem_elf_size %*/,
 	    .heap_size = 64 * 1024 * 1024, // 64 MiB
 	    .heap_blk_size = 64,           // 64 bytes
 	    .stack_size = 4 * 1024 * 1024, // 4 MiB

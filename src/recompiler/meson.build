@@ -19,6 +19,7 @@ executable(
 template_sources = [
   'templates/code.hpp.tl',
   'templates/code.cpp.tl',
+  'templates/data.cpp.tl',
   'templates/meson.build',
   'templates/meson_options.txt',
 ]

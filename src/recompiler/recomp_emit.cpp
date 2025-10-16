@@ -133,71 +133,88 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 	ofs.exceptions(std::ofstream::failbit | std::ofstream::badbit);
 	ofs.open(code_hpp_path);
 
-	ofs << "#include \"code.hpp\"" << std::endl << std::endl;
+	Template tl{"data.cpp.tl"};
 
-	std::stringstream ss;
-
-	for (auto &section : _elf.sections) {
-		if (!_section_is_data(section.get())) {
-			continue;
-		}
-
-		const std::uint8_t *data =
-		    reinterpret_cast<const std::uint8_t *>(section->get_data());
-
-		auto name = _symbol_name_map(section->get_name());
-		std::transform(name.begin(), name.end(), name.begin(), ::toupper);
-
-		// for non-got table we just write raw bytes or 0es
-		if (section->get_name().find(".got") == std::string::npos) {
-			ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-			            ? "std::array<std::uint8_t, "
-			            : "const std::array<std::uint8_t, ")
-			    << section->get_size() << "> g_" << name << "_DATA = {"
-			    << std::endl;
-
-			ss << "\t";
-			for (auto i = 0; i < section->get_size(); i++) {
-				ss << (data ? static_cast<int>(data[i]) : 0) << ", ";
-
-				if (i % 8 == 7) {
-					ss << std::endl;
-					ss << "\t";
-				}
+	tl.format("data_arrays", [&](std::stringstream &ss) {
+		for (auto &section : _elf.sections) {
+			if (!_section_is_data(section.get())) {
+				continue;
 			}
-		} else { // for got we map addresses that we know
-			ofs << ((section->get_flags() & ELFIO::SHF_WRITE)
-			            ? "std::array<std::uint32_t, "
-			            : "const std::array<std::uint32_t, ")
-			    << section->get_size() / sizeof(Word) << "> g_" << name
-			    << "_DATA = {" << std::endl;
 
-			ss << std::hex;
+			const std::uint8_t *data =
+			    reinterpret_cast<const std::uint8_t *>(section->get_data());
 
-			// map addresses
-			for (auto i = 0; i < section->get_size(); i += sizeof(Word)) {
-				Word mapped_address = 0;
+			auto name = _symbol_name_map(section->get_name());
+			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
-				for (auto &mapping : _got_mappings) {
-					Word offset = std::get<0>(mapping) - section->get_address();
-					if (offset != i) {
-						continue;
+			// for non-got table we just write raw bytes or 0es
+			if (section->get_name().find(".got") == std::string::npos) {
+				ss << ((section->get_flags() & ELFIO::SHF_WRITE)
+				           ? "std::array<std::uint8_t, "
+				           : "const std::array<std::uint8_t, ")
+				   << section->get_size() << "> " << name << "_DATA = {"
+				   << std::endl;
+
+				ss << "\t";
+				for (auto i = 0; i < section->get_size(); i++) {
+					ss << (data ? static_cast<int>(data[i]) : 0) << ", ";
+
+					if (i % 8 == 7) {
+						ss << std::endl;
+						ss << "\t";
+					}
+				}
+			} else { // for got we map addresses that we know
+				ss << ((section->get_flags() & ELFIO::SHF_WRITE)
+				           ? "std::array<std::uint32_t, "
+				           : "const std::array<std::uint32_t, ")
+				   << section->get_size() / sizeof(Word) << "> " << name
+				   << "_DATA = {" << std::endl;
+
+				ss << std::hex;
+
+				// map addresses
+				for (auto i = 0; i < section->get_size(); i += sizeof(Word)) {
+					Word mapped_address = 0;
+
+					for (auto &mapping : _got_mappings) {
+						Word offset =
+						    std::get<0>(mapping) - section->get_address();
+						if (offset != i) {
+							continue;
+						}
+
+						mapped_address = std::get<1>(mapping);
+						break;
 					}
 
-					mapped_address = std::get<1>(mapping);
-					break;
+					ss << "\t0x" << mapped_address << "," << std::endl;
 				}
 
-				ss << "\t0x" << mapped_address << "," << std::endl;
+				ss << std::dec;
 			}
 
-			ss << std::dec;
+			ss << "};" << std::endl << "};" << std::endl;
 		}
+	});
 
-		ss << "};" << std::endl << "};" << std::endl;
-	}
+	tl.format("sections", [&](std::stringstream &ss) {
+		for (auto &section : _elf.sections) {
+			if (!_section_is_data(section.get())) {
+				continue;
+			}
 
-	ofs << ss.rdbuf();
+			std::string name = _symbol_name_map(section->get_name());
+			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+
+			ss << utils::sformat(
+			          "\taccess.store(0x%X, %s_DATA, sizeof(%s_DATA));",
+			          (Word)section->get_address(), name, name)
+			   << std::endl;
+		}
+	});
+
+	ofs << tl.str();
 }
 
 void Recompiler::_emit_code_stubs(Template &tl) {
