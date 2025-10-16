@@ -12,7 +12,7 @@ namespace charm::isa::arm {
 
 struct Instruction;
 
-enum class Opcode : Byte {
+enum class Opcode {
 	AND, // logical and
 	EOR, // logical exclusive or
 	SUB, // subtract (no carry)
@@ -33,7 +33,7 @@ enum class Opcode : Byte {
 	COUNT,
 };
 
-enum class Condition : Byte {
+enum class Condition {
 	EQ, // equal
 	NE, // not equal
 	CS, // carry set
@@ -207,7 +207,7 @@ struct Instruction {
 
 	Condition condition = Condition::NV;
 	Word value = 0xFFFFFFFF; // raw representation of the instruction
-	bool immediate = false;  // is operand imm or reg?
+	bool is_imm = false;     // is operand imm or reg?
 	bool set_cflags = false; // will set condition flags?
 
 	std::variant<DataProcessing, Multiply, MultiplyLong, DataTransfer,

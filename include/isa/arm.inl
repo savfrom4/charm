@@ -40,7 +40,7 @@ inline constexpr Shifter Shifter::decode(Word value) {
 // 4.5 Data Processing
 inline constexpr DataProcessing DataProcessing::decode(Instruction &instr,
                                                        Word value) {
-	instr.immediate = get_bits<25>(value);  /* Immediate, bit 25 */
+	instr.is_imm = get_bits<25>(value);     /* Immediate, bit 25 */
 	instr.set_cflags = get_bits<20>(value); /* Set condition flags, bit 20 */
 
 	DataProcessing data = {
@@ -53,7 +53,7 @@ inline constexpr DataProcessing DataProcessing::decode(Instruction &instr,
 	};
 
 	// Operand 2
-	if (instr.immediate) {
+	if (instr.is_imm) {
 		Word rotate =
 		    get_bits<8, 4>(value); /* Amount to rotate by, bits 8-11 */
 
@@ -106,7 +106,7 @@ inline constexpr MultiplyLong MultiplyLong::decode(Instruction &instr,
 // 4.9 Single Data Transfer (LDR, STR)
 inline constexpr DataTransfer DataTransfer::decode(Instruction &instr,
                                                    Word value) {
-	instr.immediate = !get_bits<25>(value); /* Immediate, bit 25 */
+	instr.is_imm = !get_bits<25>(value); /* Immediate, bit 25 */
 
 	DataTransfer data_trans = {
 	    .p = (bool)get_bits<24>(value),  /* Pre/Post indexing, bit 24 */
@@ -120,7 +120,7 @@ inline constexpr DataTransfer DataTransfer::decode(Instruction &instr,
 	        get_bits<12, 4>(value)), /* Rd src/dst register, bits 12-15 */
 	};
 
-	if (instr.immediate) {
+	if (instr.is_imm) {
 		data_trans.imm = get_bits<0, 12>(value);
 	} else {
 		data_trans.reg = Shifter::decode(value);
@@ -132,7 +132,7 @@ inline constexpr DataTransfer DataTransfer::decode(Instruction &instr,
 // 4.10 Halfword and Signed Data Transfer
 inline constexpr HalfWordDataTransfer
 HalfWordDataTransfer::decode(Instruction &instr, Word value, bool imm) {
-	instr.immediate = imm;
+	instr.is_imm = imm;
 
 	HalfWordDataTransfer hw_data_trans = {
 	    .p = (bool)get_bits<24>(value),  /* Pre/Post indexing, bit 24 */

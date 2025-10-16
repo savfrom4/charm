@@ -1,111 +1,215 @@
-#include "debug.hpp"
-#include "helpers.hpp"
-#include "state.hpp"
+#include "arch.hpp"
+#include "runtime/memory.hpp"
 #include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <endian.h>
 #include <stdexcept>
 
+#include <isa/arm.hpp>
+#include <runtime/cpu.hpp>
+#include <runtime/helpers.hpp>
+
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #warning "Untested on big-endian systems, expect problems!"
 #endif
 
-namespace layer {
+namespace charm::runtime {
 
-void ExecutionState::arm_add(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <bool is_imm, Word value, CPUState::CRefShifter shifter>
+Word CPUState::value_or_shift() {
+	return is_imm ? value : shift<shifter>();
+}
+
+template <CPUState::CRefShifter shifter> Word CPUState::shift() {
+	Word value = r[shifter.rm];
+	Word amount =
+	    shifter.is_reg ? r[shifter.amount_or_rs] : shifter.amount_or_rs;
+
+	// LSL
+	if constexpr (shifter.type == isa::arm::Shifter::LSL) {
+		if (!amount) {
+			return value;
+		}
+
+		if (amount > 32) {
+			C = false;
+			return 0;
+		}
+
+		if (amount == 32) {
+			C = (value & 1) != 0; // bit 0
+			return 0;
+		}
+
+		C = (value & (1u << (32 - amount))) != 0; // last shifted bit
+		return value << amount;
+	}
+
+	// LSR
+	else if constexpr (shifter.type == isa::arm::Shifter::LSR) {
+		if (!amount) {
+			return value;
+		}
+
+		if (amount > 32) {
+			C = false;
+			return 0;
+		}
+
+		if (amount == 32) {
+			C = (value & (1 << 31)) != 0; // bit 31
+			return 0;
+		}
+
+		C = (value & (1u << (amount - 1))) != 0; // last shifted bit
+		return value >> amount;
+	}
+
+	// ASR
+	else if constexpr (shifter.type == isa::arm::Shifter::ASR) {
+		if (!amount) {
+			return value;
+		}
+
+		if (amount >= 32) {
+			C = (value & 0x80000000) != 0;
+			return C ? 0xFFFFFFFF : 0;
+		}
+
+		C = (value & (1u << (amount - 1))) != 0; // last shifted bit
+		return ((int32_t)value) >> amount;
+	}
+
+	// ROR
+	else {
+		if (!amount || !(amount &= 0x1F)) {
+			return value;
+		}
+
+		C = (value & (1u << (amount - 1))) != 0; // last shifted bit
+		return (value >> amount) | (value << (32 - amount));
+	}
+}
+
+template <CPUState::CRefInstr instr> void CPUState::arm_add() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	if (s) {
+	if (instr.set_cflags) {
 		int32_t unused;
-		C = __builtin_add_overflow(r[rn], op2_value, &r[rd]);
-		V = __builtin_sadd_overflow(r[rn], op2_value, &unused);
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+		C = __builtin_add_overflow(r[data.rn], value, &r[data.rd]);
+		V = __builtin_sadd_overflow(r[data.rn], value, &unused);
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 	} else {
-		r[rd] = r[rn] + op2_value;
+		r[data.rd] = r[data.rn] + value;
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_adc(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_adc() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t operand = op2_value + C;
-	if (s) {
+	Word operand = value + C;
+	if (instr.set_cflags) {
 		int32_t unused;
-		C = __builtin_add_overflow(r[rn], operand, &r[rd]);
-		V = __builtin_sadd_overflow(r[rn], operand, &unused);
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+		C = __builtin_add_overflow(r[data.rn], operand, &r[data.rd]);
+		V = __builtin_sadd_overflow(r[data.rn], operand, &unused);
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 	} else {
-		r[rd] = r[rn] + operand;
+		r[data.rd] = r[data.rn] + operand;
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_sub(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_sub() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	if (s) {
+	if (instr.set_cflags) {
 		int32_t unused;
-		C = !__builtin_sub_overflow(r[rn], op2_value, &r[rd]);
-		V = __builtin_ssub_overflow(r[rn], op2_value, &unused);
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+		C = !__builtin_sub_overflow(r[data.rn], value, &r[data.rd]);
+		V = __builtin_ssub_overflow(r[data.rn], value, &unused);
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 	} else {
-		r[rd] = r[rn] - op2_value;
+		r[data.rd] = r[data.rn] - value;
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_sbc(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_sbc() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t operand = op2_value + !C;
-	if (s) {
+	Word operand = value + !C;
+	if (instr.set_cflags) {
 		int32_t unused;
-		C = !__builtin_sub_overflow(r[rn], operand, &r[rd]);
-		V = __builtin_ssub_overflow(r[rn], operand, &unused);
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+		C = !__builtin_sub_overflow(r[data.rn], operand, &r[data.rd]);
+		V = __builtin_ssub_overflow(r[data.rn], operand, &unused);
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 	} else {
-		r[rd] = r[rn] - operand;
+		r[data.rd] = r[data.rn] - operand;
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_cmp(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_cmp() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	uint32_t result;
 	int32_t unused;
 
-	C = !__builtin_sub_overflow(r[rn], op2_value, &result);
-	V = __builtin_ssub_overflow(r[rn], op2_value, &unused);
+	C = !__builtin_sub_overflow(r[data.rn], value, &result);
+	V = __builtin_ssub_overflow(r[data.rn], value, &unused);
 	N = (result >> 31) & 1;
 	Z = !result;
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_mov(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_mov() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = op2_value;
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	r[data.rd] = value;
+
+	if (instr.set_cflags) {
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -113,51 +217,63 @@ void ExecutionState::arm_mov(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_rsb(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_rsb() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	if (s) {
+	if (instr.set_cflags) {
 		int32_t unused;
-		C = !__builtin_sub_overflow(op2_value, r[rn], &r[rd]);
-		V = __builtin_ssub_overflow(op2_value, r[rn], &unused);
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+		C = !__builtin_sub_overflow(value, r[data.rn], &r[data.rd]);
+		V = __builtin_ssub_overflow(value, r[data.rn], &unused);
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 	} else {
-		r[rd] = op2_value - r[rn];
+		r[data.rd] = value - r[data.rn];
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_rsc(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_rsc() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t operand = r[rn] + !C;
+	Word operand = r[data.rn] + !C;
 
-	if (s) {
+	if (instr.set_cflags) {
 		int32_t unused;
-		C = !__builtin_sub_overflow(op2_value, operand, &r[rd]);
-		V = __builtin_ssub_overflow(op2_value, operand, &unused);
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+		C = !__builtin_sub_overflow(value, operand, &r[data.rd]);
+		V = __builtin_ssub_overflow(value, operand, &unused);
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 	} else {
-		r[rd] = op2_value - operand;
+		r[data.rd] = value - operand;
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_and(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_and() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = r[rn] & op2_value;
+	r[data.rd] = r[data.rn] & value;
 
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	if (instr.set_cflags) {
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -165,15 +281,19 @@ void ExecutionState::arm_and(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_eor(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_eor() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = r[rn] ^ op2_value;
+	r[data.rd] = r[data.rn] ^ value;
 
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	if (instr.set_cflags) {
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -181,14 +301,18 @@ void ExecutionState::arm_eor(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_orr(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_orr() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = r[rn] | op2_value;
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	r[data.rd] = r[data.rn] | value;
+	if (instr.set_cflags) {
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -196,14 +320,18 @@ void ExecutionState::arm_orr(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_bic(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_bic() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = r[rn] & ~op2_value;
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	r[data.rd] = r[data.rn] & ~value;
+	if (instr.set_cflags) {
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -211,15 +339,19 @@ void ExecutionState::arm_bic(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_mvn(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_mvn() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = ~op2_value;
+	r[data.rd] = ~value;
 
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	if (instr.set_cflags) {
+		N = (r[data.rd] >> 31) & 1;
+		Z = !r[data.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -227,11 +359,15 @@ void ExecutionState::arm_mvn(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_tst(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_tst() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t result = r[rn] & op2_value;
+	Word result = r[data.rn] & value;
 
 	// NOTE: s is ignored, flags are always set
 	N = (result >> 31) & 1;
@@ -242,11 +378,15 @@ void ExecutionState::arm_tst(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_teq(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_teq() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t result = r[rn] ^ op2_value;
+	Word result = r[data.rn] ^ value;
 
 	// NOTE: s is ignored, flags are always set
 	N = (result >> 31) & 1;
@@ -257,35 +397,40 @@ void ExecutionState::arm_teq(bool s, Register rd, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_cmn(bool s, Register rd, Register rn,
-                             reg_value_t op2_value) {
+template <CPUState::CRefInstr instr> void CPUState::arm_cmn() {
+	constexpr const auto &data =
+	    std::get<isa::arm::DataProcessing>(instr.group);
+	const Word value =
+	    value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t result;
+	Word result;
 	int32_t unused;
 
 	// NOTE: s is ignored, flags are always set
-	C = __builtin_add_overflow(r[rn], op2_value, &result);
-	V = __builtin_sadd_overflow(r[rn], op2_value, &unused);
+	C = __builtin_add_overflow(r[data.rn], value, &result);
+	V = __builtin_sadd_overflow(r[data.rn], value, &unused);
 	N = (result >> 31) & 1;
 	Z = !result;
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_mul(bool s, Register rd, Register rn, Register rs,
-                             Register rm) {
-	UNPREDICTABLE(rd == PC || rm == PC || rs == PC,
+template <CPUState::CRefInstr instr> void CPUState::arm_mul() {
+	constexpr const auto &mul = std::get<isa::arm::Multiply>(instr.group);
+
+	UNPREDICTABLE(mul.rd == PC || mul.rm == PC || mul.rs == PC,
 	              "arm_mul: Rd/Rm or Rs must not be PC.");
-	UNPREDICTABLE(rd == rm, "arm_mul: Rd and Rm must be different registers.");
+	UNPREDICTABLE(mul.rd == mul.rm,
+	              "arm_mul: Rd and Rm must be different registers.");
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = r[rm] * r[rs];
-
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	r[mul.rd] = r[mul.rm] * r[mul.rs];
+	if (instr.set_cflags) {
+		N = (r[mul.rd] >> 31) & 1;
+		Z = !r[mul.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -293,18 +438,20 @@ void ExecutionState::arm_mul(bool s, Register rd, Register rn, Register rs,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_mla(bool s, Register rd, Register rn, Register rs,
-                             Register rm) {
-	UNPREDICTABLE(rd == PC || rm == PC || rs == PC,
+template <CPUState::CRefInstr instr> void CPUState::arm_mla() {
+	constexpr const auto &mul = std::get<isa::arm::Multiply>(instr.group);
+
+	UNPREDICTABLE(mul.rd == PC || mul.rm == PC || mul.rs == PC,
 	              "arm_mla: Rd/Rm or Rs must not be PC.");
-	UNPREDICTABLE(rd == rm, "arm_mla: Rd and Rm must be different registers.");
+	UNPREDICTABLE(mul.rd == mul.rm,
+	              "arm_mla: Rd and Rm must be different registers.");
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	r[rd] = r[rm] * r[rs] + r[rn];
-	if (s) {
-		N = (r[rd] >> 31) & 1;
-		Z = !r[rd];
+	r[mul.rd] = r[mul.rm] * r[mul.rs] + r[mul.rn];
+	if (instr.set_cflags) {
+		N = (r[mul.rd] >> 31) & 1;
+		Z = !r[mul.rd];
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -312,29 +459,30 @@ void ExecutionState::arm_mla(bool s, Register rd, Register rn, Register rs,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_mull(bool s, bool sign, Register rd_lo, Register rd_hi,
-                              Register rm, Register rs) {
-	UNPREDICTABLE(rd_lo == PC || rd_hi == PC || rm == PC || rs == PC,
-	              "arm_mull: RdLo/RdHi/Rm or Rs must not be PC.");
-	UNPREDICTABLE(rd_lo == rd_hi,
-	              "arm_mull: RdLo and RdHi must be different registers.");
+template <CPUState::CRefInstr instr> void CPUState::arm_mull() {
+	constexpr const auto &mull = std::get<isa::arm::MultiplyLong>(instr.group);
+
+	UNPREDICTABLE(mull.rd_lo == PC || mull.rd_hi == PC || mull.rm == PC ||
+	                  mull.rs == PC,
+	              "arm_mlal: RdLo/RdHi/Rm or Rs must not be PC.");
+	UNPREDICTABLE(mull.rd_lo == mull.rd_hi,
+	              "arm_mlal: RdLo and RdHi must be different registers.");
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	uint64_t result;
-
-	if (sign) {
-		result = (int64_t)r[rm] * (int64_t)r[rs];
+	if (mull.sign) {
+		result = (int64_t)r[mull.rm] * (int64_t)r[mull.rs];
 	} else {
-		result = (uint64_t)r[rm] * (uint64_t)r[rs];
+		result = (uint64_t)r[mull.rm] * (uint64_t)r[mull.rs];
 	}
 
-	r[rd_lo] = (uint32_t)result;
-	r[rd_hi] = (uint32_t)(result >> 32);
+	r[mull.rd_hi] = (uint32_t)(result >> 32);
+	r[mull.rd_lo] = (uint32_t)result;
 
-	if (s) {
+	if (instr.set_cflags) {
 		N = (result >> 63) & 1;
-		Z = (result == 0);
+		Z = !result;
 		UNAFFECTED(cf);
 		UNAFFECTED(vf);
 	}
@@ -342,30 +490,32 @@ void ExecutionState::arm_mull(bool s, bool sign, Register rd_lo, Register rd_hi,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_mlal(bool s, bool sign, Register rd_lo, Register rd_hi,
-                              Register rm, Register rs) {
-	UNPREDICTABLE(rd_lo == PC || rd_hi == PC || rm == PC || rs == PC,
+template <CPUState::CRefInstr instr> void CPUState::arm_mlal() {
+	constexpr const auto &mull = std::get<isa::arm::MultiplyLong>(instr.group);
+
+	UNPREDICTABLE(mull.rd_lo == PC || mull.rd_hi == PC || mull.rm == PC ||
+	                  mull.rs == PC,
 	              "arm_mlal: RdLo/RdHi/Rm or Rs must not be PC.");
-	UNPREDICTABLE(rd_lo == rd_hi,
+	UNPREDICTABLE(mull.rd_lo == mull.rd_hi,
 	              "arm_mlal: RdLo and RdHi must be different registers.");
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
 	uint64_t result;
-	uint64_t acc = ((uint64_t)(r[rd_hi]) << 32) | r[rd_lo];
+	uint64_t acc = ((uint64_t)(r[mull.rd_hi]) << 32) | r[mull.rd_lo];
 
-	if (sign) {
-		result = (int64_t)r[rm] * (int64_t)r[rs] + (int64_t)acc;
+	if (mull.sign) {
+		result = (int64_t)r[mull.rm] * (int64_t)r[mull.rs] + (int64_t)acc;
 	} else {
-		result = (uint64_t)r[rm] * (uint64_t)r[rs] + acc;
+		result = (uint64_t)r[mull.rm] * (uint64_t)r[mull.rs] + acc;
 	}
 
-	r[rd_lo] = (uint32_t)result;
-	r[rd_hi] = (uint32_t)(result >> 32);
+	r[mull.rd_lo] = (uint32_t)result;
+	r[mull.rd_hi] = (uint32_t)(result >> 32);
 
-	if (s) {
+	if (instr.set_cflags) {
 		N = (result >> 63) & 1;
-		Z = (result == 0);
+		Z = !result;
 		UNAFFECTED(C);
 		UNAFFECTED(V);
 	}
@@ -373,175 +523,161 @@ void ExecutionState::arm_mlal(bool s, bool sign, Register rd_lo, Register rd_hi,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_ldr(bool p, bool u, bool b, bool w, Register rn,
-                             Register rd, reg_value_t offset) {
+template <CPUState::CRefInstr instr> void CPUState::arm_ldr(Memory &memory) {
+	constexpr const auto &data_trans =
+	    std::get<isa::arm::DataTransfer>(instr.group);
+
+	UNPREDICTABLE((data_trans.w || data_trans.p) && r[data_trans.rn] == PC,
+	              "Writeback with PC as Rn.")
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t base = r[rn];
-	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
+	const Word base = r[data_trans.rn];
+	const Word offset =
+	    value_or_shift<instr.is_imm, data_trans.imm, data_trans.reg>();
+	const Word address =
+	    data_trans.p ? base + (data_trans.u ? offset : -offset) : base;
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
-	                 addr);
-
-	const void *mem = reinterpret_cast<const void *>(_address_resolve(addr));
-
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
-
-	if (UNLIKELY(!mem)) {
-		LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
-		LAYER_DBE_SEND_PAUSED(*this);
-
-		throw std::runtime_error("arm_ldr: resolved address is 0x00000000");
-	}
-
-	if (b) {
-		memset(&r[rd], 0, sizeof(reg_value_t));
-		memcpy(&r[rd], mem, sizeof(uint8_t));
+	auto access = memory.access();
+	if (data_trans.b) {
+		r[data_trans.rd] = 0;
+		access.load(address, &r[data_trans.rd], sizeof(Byte));
 	} else {
-		memcpy(&r[rd], mem, sizeof(uint32_t));
+		access.load(address, &r[data_trans.rd], sizeof(Word));
 	}
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value read: 0x%X",
-	                 r[rd]);
-
-	if (w || !p) {
-		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
-
-		r[rn] = base + (u ? offset : -offset);
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "wrote back to r%d: 0x%X", rn, r[rn]);
+	// writeback / post-indexing
+	if (data_trans.w || !data_trans.p) {
+		r[data_trans.rn] = base + (data_trans.u ? offset : -offset);
 	}
-
-	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_str(bool p, bool u, bool b, bool w, Register rn,
-                             Register rd, reg_value_t offset) {
+template <CPUState::CRefInstr instr> void CPUState::arm_str(Memory &memory) {
+	constexpr const auto &data_trans =
+	    std::get<isa::arm::DataTransfer>(instr.group);
+
+	UNPREDICTABLE((data_trans.w || data_trans.p) && r[data_trans.rn] == PC,
+	              "Writeback with PC as Rn.")
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t base = r[rn];
-	reg_value_t value = r[rd];
-	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
+	Word base = r[data_trans.rn];
+	Word value = r[data_trans.rd];
+
+	const Word offset =
+	    value_or_shift<instr.is_imm, data_trans.imm, data_trans.reg>();
+	const Word address =
+	    data_trans.p ? base + (data_trans.u ? offset : -offset) : base;
 
 	/* SPECIAL CASE: When RD is PC, store ADDR + 12 */
-	if (rd == PC) {
+	if (data_trans.rd == PC) {
 		value += 4;
 	}
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
-	                 addr);
-
-	void *mem = reinterpret_cast<void *>(_address_resolve(addr));
-
-	if (UNLIKELY(!mem)) {
-		LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
-		LAYER_DBE_SEND_PAUSED(*this);
-
-		throw std::runtime_error("arm_str: resolved address is 0x00000000");
-	}
-
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
-
-	if (b) {
-		memcpy(mem, &value, sizeof(uint8_t));
+	auto access = memory.access();
+	if (data_trans.b) {
+		access.store(address, &value, sizeof(Byte));
 	} else {
-		memcpy(mem, &value, sizeof(uint32_t));
+		access.store(address, &value, sizeof(Word));
 	}
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-	                 "value wrote to %p: 0x%X", mem, value);
-
-	if (w || !p) {
-		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
-
-		r[rn] = base + (u ? offset : -offset);
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "wrote back to r%d: 0x%X", rn, r[rn]);
+	if (data_trans.w || !data_trans.p) {
+		r[data_trans.rn] = base + (data_trans.u ? offset : -offset);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_ldrh(bool p, bool u, bool w, Register rn, Register rd,
-                              uint8_t type, reg_value_t offset) {
+template <CPUState::CRefInstr instr> void CPUState::arm_ldrh(Memory &memory) {
+	constexpr const auto &hw_data_trans =
+	    std::get<isa::arm::HalfWordDataTransfer>(instr.group);
+
+	UNPREDICTABLE((hw_data_trans.w || hw_data_trans.p) &&
+	                  r[hw_data_trans.rn] == PC,
+	              "Writeback with PC as Rn.")
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t base = r[rn];
-	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
-
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
-	                 addr);
-
-	const char *mem = reinterpret_cast<const char *>(_address_resolve(addr));
-
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
-
-	if (UNLIKELY(!mem)) {
-		LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
-		LAYER_DBE_SEND_PAUSED(*this);
-
-		throw std::runtime_error("arm_ldrh: resolved address is 0x00000000");
-	}
-
-	switch (type) {
-	case 0b01: // LDRH
-		r[rd] = 0;
-		memcpy(&r[rd], mem, sizeof(uint16_t));
-		break;
-
-	case 0b10: // LDRSB
-		int8_t byte;
-		memcpy(&byte, mem, sizeof(int8_t));
-		r[rd] = static_cast<reg_value_t>(static_cast<int32_t>(byte));
-		break;
-
-	case 0b11: // LDRSH
-		int16_t word;
-		memcpy(&word, mem, sizeof(int16_t));
-		r[rd] = static_cast<reg_value_t>(static_cast<int32_t>(word));
-		break;
-	}
-
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "value read: 0x%X",
-	                 r[rd]);
-
-	if (w || !p) {
-		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
-
-		r[rn] = base + (u ? offset : -offset);
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "wrote back to r%d: 0x%X", rn, r[rn]);
-	}
-
-	LAYER_DBE_NEXT(*this, "%s: after", __func__);
-}
-
-void ExecutionState::arm_strh(bool p, bool u, bool w, Register rn, Register rd,
-                              uint8_t type, uint32_t offset) {
-	LAYER_DBE_NEXT(*this, "%s: before", __func__);
-
-	reg_value_t base = r[rn];
-	reg_value_t value = r[rd];
-	reg_value_t addr = p ? base + (u ? offset : -offset) : base;
+	Word base = r[hw_data_trans.rn];
+	Word value = r[hw_data_trans.rd];
 
 	/* SPECIAL CASE: When RD is PC, it will actually store ADDR + 12. Since PC
 	 * is always ADDR + 8, we just add 4 to it. */
-	if (rd == PC) {
+	if (hw_data_trans.rd == PC) {
 		value += 4;
 	}
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
-	                 addr);
+	const Word offset = instr.is_imm ? hw_data_trans.imm : hw_data_trans.rm;
+	const Word address =
+	    hw_data_trans.p ? base + (hw_data_trans.u ? offset : -offset) : base;
 
-	char *mem = reinterpret_cast<char *>(_address_resolve(addr));
+	auto access = memory.access();
+	if constexpr (hw_data_trans.type ==
+	              isa::arm::HalfWordDataTransfer::HALF_WORD) {
+		r[hw_data_trans.rd] = 0;
+		access.load(address, &r[hw_data_trans.rd], sizeof(Halfword));
+	}
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
+	else if constexpr (hw_data_trans.type ==
+	                   isa::arm::HalfWordDataTransfer::SIGNED_BYTE) {
+		std::int8_t shw = 0;
+		access.load(address, &shw, sizeof(shw));
+		r[hw_data_trans.rd] = (std::int32_t)shw;
+	}
 
-	if (UNLIKELY(!mem)) {
-		LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
-		LAYER_DBE_SEND_PAUSED(*this);
+	else if constexpr (hw_data_trans.type ==
+	                   isa::arm::HalfWordDataTransfer::SIGNED_HALF_WORD) {
+		std::int16_t shw = 0;
+		access.load(address, &shw, sizeof(shw));
+		r[hw_data_trans.rd] = (std::int32_t)shw;
+	}
 
-		throw std::runtime_error("arm_strh: resolved address is 0x00000000");
+	if (hw_data_trans.w || !hw_data_trans.p) {
+		r[hw_data_trans.rn] = base + (hw_data_trans.u ? offset : -offset);
+	}
+
+	LAYER_DBE_NEXT(*this, "%s: after", __func__);
+}
+
+template <CPUState::CRefInstr instr> void CPUState::arm_strh(Memory &memory) {
+	constexpr const auto &hw_data_trans =
+	    std::get<isa::arm::HalfWordDataTransfer>(instr.group);
+
+	UNPREDICTABLE((hw_data_trans.w || hw_data_trans.p) &&
+	                  r[hw_data_trans.rn] == PC,
+	              "Writeback with PC as Rn.")
+
+	LAYER_DBE_NEXT(*this, "%s: before", __func__);
+
+	Word base = r[hw_data_trans.rn];
+	Word value = r[hw_data_trans.rd];
+
+	/* SPECIAL CASE: When RD is PC, it will actually store ADDR + 12. Since PC
+	 * is always ADDR + 8, we just add 4 to it. */
+	if (hw_data_trans.rd == PC) {
+		value += 4;
+	}
+
+	const Word offset = instr.is_imm ? hw_data_trans.imm : hw_data_trans.rm;
+	const Word address =
+	    hw_data_trans.p ? base + (hw_data_trans.u ? offset : -offset) : base;
+
+	auto access = memory.access();
+
+	if constexpr (hw_data_trans.type ==
+	              isa::arm::HalfWordDataTransfer::HALF_WORD) {
+		r[hw_data_trans.rd] = 0;
+		access.store(address, &value, sizeof(Halfword));
+	}
+
+	else if constexpr (hw_data_trans.type ==
+	                   isa::arm::HalfWordDataTransfer::SIGNED_BYTE) {
+		access.store(address, &value, sizeof(Byte));
+	}
+
+	else if constexpr (hw_data_trans.type ==
+	                   isa::arm::HalfWordDataTransfer::SIGNED_HALF_WORD) {
+		access.store(address, &value, sizeof(Byte));
 	}
 
 	switch (type) {
@@ -572,13 +708,13 @@ void ExecutionState::arm_strh(bool p, bool u, bool w, Register rn, Register rd,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_ldm(bool p, bool u, bool w, Register rn,
-                             reg_value_t reg_list) {
+template <CPUState::CRefInstr instr>
+void CPUState::arm_ldm(bool p, bool u, bool w, Register rn, Word reg_list) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t base = r[rn];
-	reg_value_t n = __builtin_popcount(reg_list);
-	reg_value_t addr;
+	Word base = r[rn];
+	Word n = __builtin_popcount(reg_list);
+	Word addr;
 
 	if (u) {
 		addr = p ? base + 4 : base;
@@ -606,7 +742,7 @@ void ExecutionState::arm_ldm(bool p, bool u, bool w, Register rn,
 		throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
 	}
 
-	for (reg_value_t i = 0; i < REGISTER_COUNT; i++) {
+	for (Word i = 0; i < REGISTER_COUNT; i++) {
 		if (!((reg_list >> i) & 1)) {
 			continue;
 		}
@@ -627,13 +763,13 @@ void ExecutionState::arm_ldm(bool p, bool u, bool w, Register rn,
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-void ExecutionState::arm_stm(bool p, bool u, bool w, Register rn,
-                             reg_value_t reg_list) {
+template <CPUState::CRefInstr instr>
+void CPUState::arm_stm(bool p, bool u, bool w, Register rn, Word reg_list) {
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	reg_value_t base = r[rn];
-	reg_value_t n = __builtin_popcount(reg_list);
-	reg_value_t addr;
+	Word base = r[rn];
+	Word n = __builtin_popcount(reg_list);
+	Word addr;
 
 	if (u) {
 		addr = p ? base + 4 : base;
@@ -656,7 +792,7 @@ void ExecutionState::arm_stm(bool p, bool u, bool w, Register rn,
 		throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
 	}
 
-	for (reg_value_t i = 0; i < REGISTER_COUNT; i++) {
+	for (Word i = 0; i < REGISTER_COUNT; i++) {
 		if (!((reg_list >> i) & 1)) {
 			continue;
 		}
@@ -684,4 +820,4 @@ void ExecutionState::arm_stm(bool p, bool u, bool w, Register rn,
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
-} // namespace layer
+} // namespace charm::runtime
