@@ -2,9 +2,7 @@
 #include "runtime/memory.hpp"
 #include <cassert>
 #include <cstdint>
-#include <cstring>
 #include <endian.h>
-#include <stdexcept>
 
 #include <isa/arm.hpp>
 #include <runtime/cpu.hpp>
@@ -666,156 +664,97 @@ template <CPUState::CRefInstr instr> void CPUState::arm_strh(Memory &memory) {
 
 	if constexpr (hw_data_trans.type ==
 	              isa::arm::HalfWordDataTransfer::HALF_WORD) {
-		r[hw_data_trans.rd] = 0;
 		access.store(address, &value, sizeof(Halfword));
 	}
 
 	else if constexpr (hw_data_trans.type ==
 	                   isa::arm::HalfWordDataTransfer::SIGNED_BYTE) {
-		access.store(address, &value, sizeof(Byte));
+		std::int8_t v = (std::int32_t)value;
+		access.store(address, &v, sizeof(v));
 	}
 
 	else if constexpr (hw_data_trans.type ==
 	                   isa::arm::HalfWordDataTransfer::SIGNED_HALF_WORD) {
-		access.store(address, &value, sizeof(Byte));
+		std::int16_t v = (std::int32_t)value;
+		access.store(address, &v, sizeof(v));
 	}
 
-	switch (type) {
-	case 0b01: // STRH
-		memcpy(mem, &value, sizeof(uint16_t));
-		break;
-
-	case 0b10: // STRSB
-		memcpy(mem, &value, sizeof(int8_t));
-		break;
-
-	case 0b11: // STRSH
-		memcpy(mem, &value, sizeof(int16_t));
-		break;
-	}
-
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-	                 "value stored to %p: 0x%X", mem, r[rd]);
-
-	if (w || !p) {
-		UNPREDICTABLE(r[rn] == PC, "Writeback with PC as Rn.")
-
-		r[rn] = base + (u ? offset : -offset);
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "wrote back to r%d: 0x%X", rn, r[rn]);
+	if (hw_data_trans.w || !hw_data_trans.p) {
+		r[hw_data_trans.rn] = base + (hw_data_trans.u ? offset : -offset);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-template <CPUState::CRefInstr instr>
-void CPUState::arm_ldm(bool p, bool u, bool w, Register rn, Word reg_list) {
+template <CPUState::CRefInstr instr> void CPUState::arm_ldm(Memory &memory) {
+	constexpr const auto &blk_data_trans =
+	    std::get<isa::arm::BlockDataTransfer>(instr.group);
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	Word base = r[rn];
-	Word n = __builtin_popcount(reg_list);
-	Word addr;
+	Word base = r[blk_data_trans.rn];
+	Word n = __builtin_popcount(blk_data_trans.reg_list);
+	Word address;
 
-	if (u) {
-		addr = p ? base + 4 : base;
+	// up/down behaviour
+	if (blk_data_trans.u) {
+		address = blk_data_trans.p ? base + 4 : base;
 	} else {
-		addr = p ? base - (n * 4) : base - 4;
+		address = blk_data_trans.p ? base - (n * 4) : base - 4;
 	}
 
-	if (w) {
-		r[rn] = u ? base + n * 4 : base - n * 4;
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "wrote back to r%d: 0x%X", rn, r[rn]);
+	// write back
+	if (blk_data_trans.w) {
+		r[blk_data_trans.rn] = blk_data_trans.u ? base + n * 4 : base - n * 4;
 	}
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
-	                 addr);
-
-	const char *mem = reinterpret_cast<const char *>(_address_resolve(addr));
-
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
-
-	if (UNLIKELY(!mem)) {
-		LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
-		LAYER_DBE_SEND_PAUSED(*this);
-
-		throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
-	}
-
-	for (Word i = 0; i < REGISTER_COUNT; i++) {
-		if (!((reg_list >> i) & 1)) {
+	auto access = memory.access();
+	for (Word i = 0; i < Register::COUNT; i++) {
+		if (!((blk_data_trans.reg_list >> i) & 1)) {
 			continue;
 		}
 
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s: before write",
-		                 __func__);
-
-		memcpy(&r[i], mem, sizeof(uint32_t));
-
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "value read from %p: 0x%X", mem, r[i]);
-
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "%s: after write",
-		                 __func__);
-		mem += 4;
+		access.load(address, &r[i], sizeof(Word));
+		address += sizeof(Word);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
 }
 
-template <CPUState::CRefInstr instr>
-void CPUState::arm_stm(bool p, bool u, bool w, Register rn, Word reg_list) {
+template <CPUState::CRefInstr instr> void CPUState::arm_stm(Memory &memory) {
+	constexpr const auto &blk_data_trans =
+	    std::get<isa::arm::BlockDataTransfer>(instr.group);
+
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
-	Word base = r[rn];
-	Word n = __builtin_popcount(reg_list);
-	Word addr;
+	Word base = r[blk_data_trans.rn];
+	Word n = __builtin_popcount(blk_data_trans.reg_list);
+	Word address;
 
-	if (u) {
-		addr = p ? base + 4 : base;
+	if (blk_data_trans.u) {
+		address = blk_data_trans.p ? base + 4 : base;
 	} else {
-		addr = p ? base - (n * 4) : base - 4;
+		address = blk_data_trans.p ? base - (n * 4) : base - 4;
 	}
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "virtual address: 0x%X",
-	                 addr);
-
-	char *mem = reinterpret_cast<char *>(_address_resolve(addr));
 	bool written = false;
+	auto access = memory.access();
 
-	LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT, "resolved to: %p", mem);
-
-	if (UNLIKELY(!mem)) {
-		LAYER_DBE_LOG(*this, "%s", "error: resolved address is 0x00000000!");
-		LAYER_DBE_SEND_PAUSED(*this);
-
-		throw std::runtime_error("arm_ldm: resolved address is 0x00000000");
-	}
-
-	for (Word i = 0; i < REGISTER_COUNT; i++) {
-		if (!((reg_list >> i) & 1)) {
+	for (Word i = 0; i < Register::COUNT; i++) {
+		if (!((blk_data_trans.reg_list >> i) & 1)) {
 			continue;
 		}
 
-		LAYER_DBE_NEXT(*this, "%s: before write", __func__);
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "value wrote to %p: 0x%X", mem, r[i]);
+		access.load(address, &r[i], sizeof(Word));
+		address += sizeof(Word);
 
-		memcpy(mem, &r[i], sizeof(uint32_t));
-		mem += 4;
-
-		LAYER_DBE_NEXT(*this, "%s: after write", __func__);
-
-		if (!w || written) {
+		if (!blk_data_trans.w || written) {
 			continue;
 		}
 
 		// We write-back now
-		r[rn] = u ? base + n * 4 : base - n * 4;
+		r[blk_data_trans.rn] = blk_data_trans.u ? base + n * 4 : base - n * 4;
 		written = true;
-
-		LAYER_DBE_LOG_IF(*this, dbe.flags & Debugee::NEXT,
-		                 "wrote back to r%d: 0x%X", rn, r[rn]);
 	}
 
 	LAYER_DBE_NEXT(*this, "%s: after", __func__);
