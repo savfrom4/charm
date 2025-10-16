@@ -661,7 +661,6 @@ template <CPUState::CRefInstr instr> void CPUState::arm_strh(Memory &memory) {
 	    hw_data_trans.p ? base + (hw_data_trans.u ? offset : -offset) : base;
 
 	auto access = memory.access();
-
 	if constexpr (hw_data_trans.type ==
 	              isa::arm::HalfWordDataTransfer::HALF_WORD) {
 		access.store(address, &value, sizeof(Halfword));
