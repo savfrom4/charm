@@ -149,11 +149,11 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 
 			// for non-got table we just write raw bytes or 0es
 			if (section->get_name().find(".got") == std::string::npos) {
-				ss << ((section->get_flags() & ELFIO::SHF_WRITE)
-				           ? "std::array<std::uint8_t, "
-				           : "const std::array<std::uint8_t, ")
-				   << section->get_size() << "> " << name << "_DATA = {"
-				   << std::endl;
+				ss << utils::sformat("%s> %s_DATA = {",
+				                     ((section->get_flags() & ELFIO::SHF_WRITE)
+				                          ? "std::array<Byte, "
+				                          : "const std::array<Byte, "),
+				                     section->get_size() / sizeof(Word), name);
 
 				ss << "\t";
 				for (auto i = 0; i < section->get_size(); i++) {
@@ -165,11 +165,11 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 					}
 				}
 			} else { // for got we map addresses that we know
-				ss << ((section->get_flags() & ELFIO::SHF_WRITE)
-				           ? "std::array<std::uint32_t, "
-				           : "const std::array<std::uint32_t, ")
-				   << section->get_size() / sizeof(Word) << "> " << name
-				   << "_DATA = {" << std::endl;
+				ss << utils::sformat("%s> %s_DATA = {",
+				                     ((section->get_flags() & ELFIO::SHF_WRITE)
+				                          ? "std::array<Word, "
+				                          : "const std::array<Word, "),
+				                     section->get_size() / sizeof(Word), name);
 
 				ss << std::hex;
 
@@ -208,7 +208,7 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
 			ss << utils::sformat(
-			          "\taccess.store(0x%X, %s_DATA, sizeof(%s_DATA));",
+			          "\taccess.store(0x%X, %s_DATA.data(), %s_DATA.size());",
 			          (Word)section->get_address(), name, name)
 			   << std::endl;
 		}

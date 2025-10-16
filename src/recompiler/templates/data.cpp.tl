@@ -1,5 +1,7 @@
 #include "code.hpp"
 
+#include <arch.hpp>
+
 /*% data_arrays %*/
 
 // clang-format off
