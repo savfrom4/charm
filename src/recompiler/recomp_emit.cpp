@@ -194,7 +194,7 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 				ss << std::dec;
 			}
 
-			ss << "};" << std::endl << "};" << std::endl;
+			ss << "};" << std::endl << std::endl;
 		}
 	});
 

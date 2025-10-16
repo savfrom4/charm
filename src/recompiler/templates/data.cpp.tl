@@ -6,7 +6,6 @@
 
 void ExecutionState::init_elf_sections() {
     auto access = memory.access();
-
 /*% sections %*/
 }
 
