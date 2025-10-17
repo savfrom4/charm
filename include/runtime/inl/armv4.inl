@@ -645,7 +645,7 @@ inline void CPUState::arm_stm(Memory &memory) {
 			continue;
 		}
 
-		access.load(address, &r[i], sizeof(Word));
+		access.store(address, &r[i], sizeof(Word));
 		address += sizeof(Word);
 
 		if (!blk_data_trans.w || written) {

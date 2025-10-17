@@ -220,11 +220,15 @@ void Recompiler::_emit_data_source(const std::filesystem::path &output_dir) {
 			std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
 			ss << utils::sformat(
-			          "\taccess.store(0x%X, %s_DATA.data(), %s_DATA.size());",
+			          "\taccess.store(0x%X, %s_DATA.data(), sizeof(%s_DATA));",
 			          (Word)section->get_address(), name, name)
 			   << std::endl;
 
-			_elf_total_size += section->get_size();
+			const Word total_space =
+			    section->get_address() + section->get_size();
+			if (total_space > _elf_total_size) {
+				_elf_total_size = total_space;
+			}
 		}
 	});
 

@@ -231,4 +231,4 @@ struct Instruction {
 
 } // namespace charm::isa::arm
 
-#include "arm.inl"
+#include "inl/arm.inl"

@@ -21,9 +21,9 @@ class MemoryAccessGuard : public std::lock_guard<std::mutex> {
   public:
 	MemoryAccessGuard(std::mutex &mutex, Memory &memory);
 
-	template <typename T> T *ptr(Word address) {
+	template <typename T> T ptr(Word address) {
 		static_assert(std::is_pointer_v<T>, "T must be a pointer!");
-		return reinterpret_cast<T *>(
+		return reinterpret_cast<T>(
 		    _impl_access(address, !std::is_const_v<std::remove_pointer_t<T>>));
 	}
 
@@ -38,6 +38,16 @@ class MemoryAccessGuard : public std::lock_guard<std::mutex> {
 	MemoryAccessGuard &store(Word address, T buffer, Word size) {
 		static_assert(std::is_pointer_v<T>, "T must be a pointer!");
 		std::memcpy(_impl_access(address, true), buffer, size);
+		return *this;
+	}
+
+	MemoryAccessGuard &copy(Word dst, Word src, Word size) {
+		std::memcpy(_impl_access(dst, true), _impl_access(src, false), size);
+		return *this;
+	}
+
+	MemoryAccessGuard &fill(Word address, Byte c, Word size) {
+		std::memset(_impl_access(address, true), c, size);
 		return *this;
 	}
 
@@ -70,9 +80,10 @@ class Memory {
 
 	MemoryConfig _config;
 
-	Word _heap_base, _stack_base;
-	std::vector<std::uint8_t> _data;
 	std::mutex _mutex;
+	std::vector<std::uint8_t> _data;
+
+	Word _heap_base, _stack_base;
 };
 
 } // namespace charm::runtime

@@ -1,3 +1,4 @@
+#include "utils.hpp"
 #include <sstream>
 
 #include <isa/arm.hpp>
@@ -47,10 +48,9 @@ void Recompiler::_emit_code_section(std::ostream &os,
 
 		// debug information for instruction debugging
 		// if (!_minify) {
-		// 	ss << "\t\t" << COND_TABLE[(int)instr.condition] << "(";
-		// 	ss << "LAYER_DBE_SKIP(*this, \"%s\", \"0x" << std::hex << addr
-		// 	   << ": ";
-		// 	ss << instr.dump() << "\"));" << std::endl;
+		// 	ss << utils::sformat("%s(std::cout << \"%s\" << std::endl);",
+		// 	                     COND_TABLE[(int)instr.condition],
+		// 	                     instr.dump());
 		// }
 
 		// emit instruction impl
@@ -128,8 +128,8 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		os << _emit_arm_from_table<
 		    std::array<std::string, (int)isa::arm::Opcode::COUNT>>(
 		    {
-		        "arm_ldr",
 		        "arm_str",
+		        "arm_ldr",
 		    },
 		    (int)instr.data_trans.ld, instr.value, "memory");
 		break;
@@ -140,8 +140,8 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		os << _emit_arm_from_table<
 		    std::array<std::string, (int)isa::arm::Opcode::COUNT>>(
 		    {
-		        "arm_ldrh",
 		        "arm_strh",
+		        "arm_ldrh",
 		    },
 		    (int)instr.hw_data_trans.ld, instr.value, "memory");
 		break;
@@ -151,8 +151,8 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		os << _emit_arm_from_table<
 		    std::array<std::string, (int)isa::arm::Opcode::COUNT>>(
 		    {
-		        "arm_ldm",
 		        "arm_stm",
+		        "arm_ldm",
 		    },
 		    (int)instr.blk_data_trans.ld, instr.value, "memory");
 		break;
@@ -185,8 +185,8 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		}
 
 		if (instr.branch.link) {
-			os << "cpu.r[LR] = 0x" << std::hex << address + 4 << std::dec
-			   << "; ";
+			os << "cpu.r[LR] = 0x" << std::hex << address + sizeof(Word)
+			   << std::dec << "; ";
 			os << "address = " << std::hex << "0x" << final_offset
 			   << "; goto __start__; " << MINIFY_COMMENT("/* bl */");
 			break;
@@ -321,16 +321,15 @@ void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
 
 	case isa::arm::InstructionGroup::BRANCH_EXCHANGE:
 	case isa::arm::InstructionGroup::BRANCH:
-	case isa::arm::InstructionGroup::SWI: {
+	case isa::arm::InstructionGroup::SWI:
 	case isa::arm::InstructionGroup::INVALID: {
 		return; // these never modify pc, or the logic is handeled elsewhere
 		        // (like with branches)
 	}
 	}
 
-		os << " JUMP(r[" << REGISTER_TABLE[Register::PC] << "]);";
-		os << MINIFY_COMMENT(" /* modifies pc */");
-	}
+	os << " JUMP(cpu.r[" << REGISTER_TABLE[Register::PC] << "]);";
+	os << MINIFY_COMMENT(" /* modifies pc */");
 }
 
 } // namespace charm::recomp

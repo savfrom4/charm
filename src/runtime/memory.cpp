@@ -1,7 +1,9 @@
-#include "arch.hpp"
-#include "utils.hpp"
-#include <runtime/memory.hpp>
+#include <iostream>
 #include <stdexcept>
+
+#include <arch.hpp>
+#include <runtime/memory.hpp>
+#include <utils.hpp>
 
 namespace charm::runtime {
 
@@ -14,7 +16,6 @@ Memory::Memory(MemoryConfig config) : _config(config) {
 	// word-align sizes
 	_heap_base = (_config.elf_size + 3) & ~3;
 	_stack_base = _heap_base + ((_config.heap_size + 3) & ~3);
-
 	_data.resize(_stack_base + ((_config.stack_size + 3) & ~3));
 
 	const HeapBlock blk = {
@@ -44,7 +45,7 @@ Word MemoryAccessGuard::_impl_halloc(Word size) {
 	size = (size + 3) & ~3; // word-align
 
 	// we iterate trying to find a free block
-	Byte *ptr = _memory._data.data() + _memory._heap_base;
+	Byte *ptr = &_memory._data[_memory._heap_base];
 	const Byte *end = ptr + _memory._config.heap_size;
 
 	while (ptr < end) {
@@ -95,6 +96,7 @@ Word MemoryAccessGuard::_impl_halloc(Word size) {
 			// hey maybe we reached our target!
 			accumulated_size += next_blk.size;
 			n++;
+
 			if (accumulated_size >= size) {
 				found = true;
 				break;
@@ -129,6 +131,7 @@ void MemoryAccessGuard::_impl_hfree(Word address) {
 }
 
 void *MemoryAccessGuard::_impl_access(Word address, bool read_write) {
+	std::cout << utils::sformat("0x%X", address) << std::endl;
 	if (!address || address >= _memory._data.size()) {
 		throw std::runtime_error(utils::sformat(
 		    "%s: Segmentation fault (access 0x%X)", __func__, address));
