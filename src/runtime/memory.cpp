@@ -13,7 +13,7 @@ struct HeapBlock {
 Memory::Memory(MemoryConfig config) : _config(config) {
 	// word-align sizes
 	_heap_base = (_config.elf_size + 3) & ~3;
-	_stack_base = _heap_base + (_config.heap_size + 3) & ~3;
+	_stack_base = _heap_base + ((_config.heap_size + 3) & ~3);
 
 	_data.resize(_stack_base + ((_config.stack_size + 3) & ~3));
 
@@ -130,8 +130,8 @@ void MemoryAccessGuard::_impl_hfree(Word address) {
 
 void *MemoryAccessGuard::_impl_access(Word address, bool read_write) {
 	if (!address || address >= _memory._data.size()) {
-		throw std::runtime_error(
-		    utils::sformat("%s: Segmentation fault.", __func__));
+		throw std::runtime_error(utils::sformat(
+		    "%s: Segmentation fault (access 0x%X)", __func__, address));
 	}
 
 	return reinterpret_cast<void *>(&_memory._data[address]);

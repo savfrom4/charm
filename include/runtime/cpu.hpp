@@ -58,8 +58,9 @@ class CPUState {
 	template <CRefInstr> void arm_stm(Memory &memory);
 
   private:
-	template <bool, Word, CRefShifter> Word _value_or_shift();
-	template <CRefShifter> Word _shift();
+	template <bool, CRefShifter> Word _shift();
 };
 
 } // namespace charm::runtime
+
+#include "inl/armv4.inl"

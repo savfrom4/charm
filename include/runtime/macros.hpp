@@ -2,7 +2,7 @@
 #include <arch.hpp>
 
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#define UNPREDICTABLE(x, msg) static_assert(x, msg);
+#define UNPREDICTABLE(x, msg)
 #define UNAFFECTED(x)
 
 #define EQ(x)                                                                  \

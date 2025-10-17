@@ -114,9 +114,10 @@ void Recompiler::_emit_code_source(const std::filesystem::path &output_dir) {
 				continue;
 			}
 
-			ss << utils::sformat("INSTR(0x%X) { external_%s(); JUMP(r[LR]); }",
-			                     functions.second.address,
-			                     _symbol_name_map(functions.second.name))
+			ss << utils::sformat(
+			          "INSTR(0x%X) { external_%s(); JUMP(cpu.r[LR]); }",
+			          functions.second.address,
+			          _symbol_name_map(functions.second.name))
 			   << std::endl;
 		}
 	});

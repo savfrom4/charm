@@ -54,12 +54,18 @@ inline constexpr DataProcessing DataProcessing::decode(Instruction &instr,
 
 	// Operand 2
 	if (instr.is_imm) {
-		Word rotate =
-		    get_bits<8, 4>(value); /* Amount to rotate by, bits 8-11 */
-
+		Word amount =
+		    get_bits<8, 4>(value);        /* Amount to rotate by, bits 8-11 */
 		Word imm = get_bits<0, 8>(value); /* Value, bits 0-7 */
-		rotate *= 2;
-		data.op2_imm = (imm >> rotate) | (imm << (32 - rotate));
+
+		amount *= 2;
+
+		if (!amount) {
+			data.op2_imm = imm;
+			return data;
+		}
+
+		data.op2_imm = (imm >> amount) | (imm << (32 - amount));
 	} else {
 		data.op2_reg = Shifter::decode(value);
 	}
