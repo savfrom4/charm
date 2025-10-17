@@ -17,7 +17,7 @@ struct ExecutionState {
 	    .elf_size = /*% elf_total_size %*/,
 	    .heap_size = 64 * 1024 * 1024, // 64 MiB
 	    .heap_blk_size = 64,           // 64 bytes
-	    .stack_size = 4 * 1024 * 1024, // 4 MiB
+	    .stack_size = 16 * 1024 * 1024, // 4 MiB
 	}};
 
 	inline ExecutionState() {
