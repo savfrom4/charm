@@ -223,30 +223,39 @@ inline constexpr Instruction::Instruction(Word value)
 			Word type = get_bits<23, 5>(value);
 
 			if (!type) {
-				group = Multiply::decode(*this, value);
+				group = InstructionGroup::MULTIPLY;
+				mul = Multiply::decode(*this, value);
 			} else if (type == 0b00001) {
-				group = MultiplyLong::decode(*this, value);
+				group = InstructionGroup::MULTIPLY_LONG;
+				mull = MultiplyLong::decode(*this, value);
 			} else if (type == 0b00010 && !get_bits<8, 4>(value)) {
-				group = DataSwap::decode(value);
+				group = InstructionGroup::DATA_SWAP;
+				data_swap = DataSwap::decode(value);
 			}
 		}
 
 		// check for specific branchex bit pattern
 		else if (bits_8_4 == 0b0001 &&
 		         get_bits<4, 22>(value) == 0b0100101111111111110001) {
-			group = BranchEx::decode(value);
+			group = InstructionGroup::BRANCH_EXCHANGE;
+			branchex = BranchEx::decode(value);
 		}
 
 		else if (!bit_25 && get_bits<7>(value) && get_bits<4>(value)) {
 			if (get_bits<22>(value)) { // immediate
-				group = HalfWordDataTransfer::decode(*this, value, true);
+				group = InstructionGroup::HALFWORD_DATA_TRANSFER;
+				hw_data_trans =
+				    HalfWordDataTransfer::decode(*this, value, true);
 			} else if (!get_bits<8, 4>(value)) { // register
-				group = HalfWordDataTransfer::decode(*this, value, false);
+				group = InstructionGroup::HALFWORD_DATA_TRANSFER;
+				hw_data_trans =
+				    HalfWordDataTransfer::decode(*this, value, false);
 			}
 		}
 
 		else {
-			group = DataProcessing::decode(*this, value);
+			group = InstructionGroup::DATA_PROCESSING;
+			data = DataProcessing::decode(*this, value);
 		}
 
 		break;
@@ -254,16 +263,19 @@ inline constexpr Instruction::Instruction(Word value)
 
 	// single data transfer
 	case 0b01: {
-		group = DataTransfer::decode(*this, value);
+		group = InstructionGroup::DATA_TRANSFER;
+		data_trans = DataTransfer::decode(*this, value);
 		break;
 	}
 
 	// branch / block data transfer
 	case 0b10: {
 		if (!bit_25) {
-			group = BlockDataTransfer::decode(value);
+			group = InstructionGroup::BLOCK_DATA_TRANSFER;
+			blk_data_trans = BlockDataTransfer::decode(value);
 		} else { // branch
-			group = Branch::decode(value);
+			group = InstructionGroup::BRANCH;
+			branch = Branch::decode(value);
 		}
 
 		break;
@@ -276,7 +288,8 @@ inline constexpr Instruction::Instruction(Word value)
 			break;
 		}
 
-		group = SWI::decode(value);
+		group = InstructionGroup::SWI;
+		swi = SWI::decode(value);
 		break;
 	}
 	}

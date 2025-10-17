@@ -9,7 +9,7 @@ namespace charm::runtime {
 
 class CPUState {
   public:
-	using CRefInstr = const isa::arm::Instruction &;
+	using CRefInstr = const isa::arm::Instruction;
 	using CRefShifter = const isa::arm::Shifter &;
 
 	std::array<Word, Register::COUNT> r = {0};

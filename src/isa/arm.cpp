@@ -36,11 +36,9 @@ std::string Instruction::dump() const {
 	// add condition prefix
 	ss << utils::sformat("(%s) ", COND_TABLE[(int)condition]);
 
-	switch ((InstructionGroup)group.index()) {
+	switch (group) {
 
 	case InstructionGroup::DATA_PROCESSING: {
-		const auto &data = std::get<DataProcessing>(group);
-
 		// opcode, rd, rn
 		ss << utils::sformat("%s\t%s, %s, ", OPCODE_TABLE[(int)data.op],
 		                     REGISTER_TABLE[(int)data.rd],
@@ -66,8 +64,6 @@ std::string Instruction::dump() const {
 	}
 
 	case InstructionGroup::MULTIPLY: {
-		const auto &mul = std::get<Multiply>(group);
-
 		// mul/mla rd, rm, rs
 		ss << utils::sformat("%s\t%s, %s, %s", (mul.a ? "mla" : "mul"),
 		                     REGISTER_TABLE[(int)mul.rd],
@@ -83,23 +79,18 @@ std::string Instruction::dump() const {
 	}
 
 	case InstructionGroup::MULTIPLY_LONG: {
-		const auto &mul_long = std::get<MultiplyLong>(group);
-
 		// prefix
-		ss << (mul_long.sign ? "s" : "u");
+		ss << (mull.sign ? "s" : "u");
 
 		// (s/u)mul/mlal rd_lo, rd_hi, rm, rs
-		ss << utils::sformat("%s\t%s, %s, %s, %s", mul_long.a ? "mlal" : "mull",
-		                     REGISTER_TABLE[(int)mul_long.rd_lo],
-		                     REGISTER_TABLE[(int)mul_long.rd_hi],
-		                     REGISTER_TABLE[(int)mul_long.rm],
-		                     REGISTER_TABLE[(int)mul_long.rs]);
+		ss << utils::sformat(
+		    "%s\t%s, %s, %s, %s", mull.a ? "mlal" : "mull",
+		    REGISTER_TABLE[(int)mull.rd_lo], REGISTER_TABLE[(int)mull.rd_hi],
+		    REGISTER_TABLE[(int)mull.rm], REGISTER_TABLE[(int)mull.rs]);
 		break;
 	}
 
 	case InstructionGroup::DATA_TRANSFER: {
-		const auto &data_trans = std::get<DataTransfer>(group);
-
 		// push/pop rd
 		if (is_imm && data_trans.w && data_trans.rn == Register::SP &&
 		    data_trans.imm == 4 && data_trans.u == data_trans.ld) {
@@ -151,8 +142,6 @@ std::string Instruction::dump() const {
 	}
 
 	case InstructionGroup::HALFWORD_DATA_TRANSFER: {
-		const auto &hw_data_trans = std::get<HalfWordDataTransfer>(group);
-
 		const std::array<std::string, 4> type_table = {
 		    "(INVALID)",
 		    "h",
@@ -191,8 +180,6 @@ std::string Instruction::dump() const {
 	}
 
 	case InstructionGroup::BLOCK_DATA_TRANSFER: {
-		const auto &blk_data_trans = std::get<BlockDataTransfer>(group);
-
 		if (blk_data_trans.rn == Register::SP && blk_data_trans.w) {
 			ss << utils::sformat("%s\t{", (blk_data_trans.ld ? "pop" : "push"));
 		} else {
@@ -219,8 +206,6 @@ std::string Instruction::dump() const {
 	}
 
 	case InstructionGroup::DATA_SWAP: {
-		const auto &data_swap = std::get<DataSwap>(group);
-
 		// swpb/swp rd, rm, [rn]
 		ss << utils::sformat("%s\t%s, %s, [%s]", data_swap.b ? "swpb " : "swp ",
 		                     REGISTER_TABLE[(int)data_swap.rd],
@@ -230,8 +215,6 @@ std::string Instruction::dump() const {
 	}
 
 	case InstructionGroup::BRANCH: {
-		const auto &branch = std::get<Branch>(group);
-
 		// b #imm
 		ss << utils::sformat("%s\t#%" PRId32, (branch.link ? "bl " : "b "),
 		                     branch.offset);
@@ -239,8 +222,6 @@ std::string Instruction::dump() const {
 	}
 
 	case InstructionGroup::BRANCH_EXCHANGE: {
-		const auto &branchex = std::get<BranchEx>(group);
-
 		// b rm
 		ss << utils::sformat("bx\t%s", REGISTER_TABLE[(int)branchex.rm]);
 		break;

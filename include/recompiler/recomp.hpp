@@ -48,8 +48,7 @@ class Recompiler {
 	template <typename Array>
 	inline std::string _emit_arm_from_table(Array array, int index, Word value,
 	                                        const std::string &arg = "") {
-		return utils::sformat("cpu.%s<isa::arm::Instruction(0x%X)>(%s);",
-		                      array[index], value, arg);
+		return utils::sformat("cpu.%s<0x%X>(%s);", array[index], value, arg);
 	}
 
 	template <typename... Args>

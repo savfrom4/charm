@@ -78,11 +78,8 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
                            Word address) {
 	os << "\t\t" << COND_TABLE[(int)instr.condition] << "(";
 
-	const auto group = (isa::arm::InstructionGroup)instr.group.index();
-	switch (group) {
+	switch (instr.group) {
 	case isa::arm::InstructionGroup::DATA_PROCESSING: {
-		const auto &data = std::get<isa::arm::DataProcessing>(instr.group);
-
 		os << _emit_arm_from_table<
 		    std::array<std::string, (int)isa::arm::Opcode::COUNT>>(
 		    {
@@ -103,47 +100,42 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		        "arm_bic",
 		        "arm_mvn",
 		    },
-		    (int)data.op, instr.value);
+		    (int)instr.data.op, instr.value);
 		break;
 	}
 
 	case isa::arm::InstructionGroup::MULTIPLY: {
-		const auto &mul = std::get<isa::arm::Multiply>(instr.group);
 		os << _emit_arm_from_table<std::array<std::string, 2>>(
 		    {
 		        "arm_mul",
 		        "arm_mla",
 		    },
-		    (int)mul.a, instr.value);
+		    (int)instr.mul.a, instr.value);
 		break;
 	}
 
 	case isa::arm::InstructionGroup::MULTIPLY_LONG: {
-		const auto &mull = std::get<isa::arm::MultiplyLong>(instr.group);
 		os << _emit_arm_from_table<std::array<std::string, 2>>(
 		    {
 		        "arm_mull",
 		        "arm_mlal",
 		    },
-		    (int)mull.a, instr.value);
+		    (int)instr.mull.a, instr.value);
 		break;
 	}
 
 	case isa::arm::InstructionGroup::DATA_TRANSFER: {
-		const auto &data_trans = std::get<isa::arm::DataTransfer>(instr.group);
 		os << _emit_arm_from_table<
 		    std::array<std::string, (int)isa::arm::Opcode::COUNT>>(
 		    {
 		        "arm_ldr",
 		        "arm_str",
 		    },
-		    (int)data_trans.ld, instr.value, "memory");
+		    (int)instr.data_trans.ld, instr.value, "memory");
 		break;
 	}
 
 	case isa::arm::InstructionGroup::HALFWORD_DATA_TRANSFER: {
-		const auto &hw_data_trans =
-		    std::get<isa::arm::HalfWordDataTransfer>(instr.group);
 
 		os << _emit_arm_from_table<
 		    std::array<std::string, (int)isa::arm::Opcode::COUNT>>(
@@ -151,27 +143,23 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 		        "arm_ldrh",
 		        "arm_strh",
 		    },
-		    (int)hw_data_trans.ld, instr.value, "memory");
+		    (int)instr.hw_data_trans.ld, instr.value, "memory");
 		break;
 	}
 
 	case isa::arm::InstructionGroup::BLOCK_DATA_TRANSFER: {
-		const auto &blk_data_trans =
-		    std::get<isa::arm::BlockDataTransfer>(instr.group);
-
 		os << _emit_arm_from_table<
 		    std::array<std::string, (int)isa::arm::Opcode::COUNT>>(
 		    {
 		        "arm_ldm",
 		        "arm_stm",
 		    },
-		    (int)blk_data_trans.ld, instr.value, "memory");
+		    (int)instr.blk_data_trans.ld, instr.value, "memory");
 		break;
 	}
 
 	case isa::arm::InstructionGroup::BRANCH: {
-		const auto &branch = std::get<isa::arm::Branch>(instr.group);
-		Word final_offset = (std::int64_t)address + 8 + branch.offset;
+		Word final_offset = (std::int64_t)address + 8 + instr.branch.offset;
 
 		// maybe we are calling external fn
 		bool found_section = false;
@@ -196,7 +184,7 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 			break;
 		}
 
-		if (branch.link) {
+		if (instr.branch.link) {
 			os << "cpu.r[LR] = 0x" << std::hex << address + 4 << std::dec
 			   << "; ";
 			os << "address = " << std::hex << "0x" << final_offset
@@ -209,9 +197,8 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 	}
 
 	case isa::arm::InstructionGroup::BRANCH_EXCHANGE: {
-		const auto &branchex = std::get<isa::arm::BranchEx>(instr.group);
 		os << "address = " << std::hex << "cpu.r["
-		   << REGISTER_TABLE[(int)branchex.rm] << "]; goto __start__; "
+		   << REGISTER_TABLE[(int)instr.branchex.rm] << "]; goto __start__; "
 		   << MINIFY_COMMENT("/* bx */");
 		break;
 	}
@@ -241,16 +228,14 @@ void Recompiler::_emit_arm(std::ostream &os, const isa::arm::Instruction &instr,
 void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
                                        const isa::arm::Instruction &instr,
                                        Word address) {
-	switch ((isa::arm::InstructionGroup)instr.group.index()) {
+	switch (instr.group) {
 	case isa::arm::InstructionGroup::DATA_PROCESSING: {
-		const auto &data = std::get<isa::arm::DataProcessing>(instr.group);
-
 		// check if instruction tries to modify pc
-		if (data.rd != Register::PC) {
+		if (instr.data.rd != Register::PC) {
 			return;
 		}
 
-		switch (data.op) {
+		switch (instr.data.op) {
 		case isa::arm::Opcode::TST:
 		case isa::arm::Opcode::TEQ:
 		case isa::arm::Opcode::CMP:
@@ -266,10 +251,8 @@ void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
 	}
 
 	case isa::arm::InstructionGroup::MULTIPLY: {
-		const auto &mul = std::get<isa::arm::Multiply>(instr.group);
-
 		// rd must be pc
-		if (mul.rd != Register::PC) {
+		if (instr.mul.rd != Register::PC) {
 			return;
 		}
 
@@ -277,10 +260,9 @@ void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
 	}
 
 	case isa::arm::InstructionGroup::MULTIPLY_LONG: {
-		const auto &mul_long = std::get<isa::arm::MultiplyLong>(instr.group);
-
 		// either rd hi or rd lo must be pc
-		if (mul_long.rd_hi != Register::PC && mul_long.rd_lo != Register::PC) {
+		if (instr.mull.rd_hi != Register::PC &&
+		    instr.mull.rd_lo != Register::PC) {
 			return;
 		}
 
@@ -288,10 +270,8 @@ void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
 	}
 
 	case isa::arm::InstructionGroup::DATA_SWAP: {
-		const auto &data_swap = std::get<isa::arm::DataSwap>(instr.group);
-
 		// rd must be pc
-		if (data_swap.rd != Register::PC) {
+		if (instr.data_swap.rd != Register::PC) {
 			return;
 		}
 
@@ -303,13 +283,12 @@ void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
 		// not present here.
 
 	case isa::arm::InstructionGroup::DATA_TRANSFER: {
-		const auto &data_trans = std::get<isa::arm::DataTransfer>(instr.group);
-		if (!data_trans.ld) {
+		if (!instr.data_trans.ld) {
 			return;
 		}
 
 		// rd must be pc
-		if (data_trans.rd != Register::PC) {
+		if (instr.data_trans.rd != Register::PC) {
 			return;
 		}
 
@@ -317,14 +296,11 @@ void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
 	}
 
 	case isa::arm::InstructionGroup::HALFWORD_DATA_TRANSFER: {
-		const auto &hw_data_trans =
-		    std::get<isa::arm::HalfWordDataTransfer>(instr.group);
-
-		if (!hw_data_trans.ld) {
+		if (!instr.hw_data_trans.ld) {
 			return;
 		}
 
-		if (hw_data_trans.rd != Register::PC) {
+		if (instr.hw_data_trans.rd != Register::PC) {
 			return;
 		}
 
@@ -332,13 +308,11 @@ void Recompiler::_emit_arm_modifies_pc(std::ostream &os,
 	}
 
 	case isa::arm::InstructionGroup::BLOCK_DATA_TRANSFER: {
-		const auto &blk_data_trans =
-		    std::get<isa::arm::BlockDataTransfer>(instr.group);
-		if (!blk_data_trans.ld) {
+		if (!instr.blk_data_trans.ld) {
 			return;
 		}
 
-		if (!((blk_data_trans.reg_list >> Register::PC) & 1)) {
+		if (!((instr.blk_data_trans.reg_list >> Register::PC) & 1)) {
 			return;
 		}
 

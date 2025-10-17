@@ -91,8 +91,7 @@ template <CPUState::CRefShifter shifter> Word CPUState::_shift() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_add() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -112,8 +111,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_add() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_adc() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -134,8 +132,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_adc() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_sub() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -155,8 +152,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_sub() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_sbc() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -177,8 +173,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_sbc() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_cmp() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -196,8 +191,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_cmp() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_mov() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -216,8 +210,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mov() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_rsb() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -237,8 +230,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_rsb() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_rsc() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -260,8 +252,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_rsc() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_and() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -280,8 +271,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_and() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_eor() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -300,8 +290,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_eor() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_orr() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -319,8 +308,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_orr() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_bic() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -338,8 +326,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_bic() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_mvn() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -358,8 +345,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mvn() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_tst() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -377,8 +363,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_tst() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_teq() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -396,8 +381,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_teq() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_cmn() {
-	constexpr const auto &data =
-	    std::get<isa::arm::DataProcessing>(instr.group);
+	constexpr const auto &data = instr.data;
 	const Word value =
 	    _value_or_shift<instr.is_imm, data.op2_imm, data.op2_reg>();
 
@@ -416,7 +400,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_cmn() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_mul() {
-	constexpr const auto &mul = std::get<isa::arm::Multiply>(instr.group);
+	constexpr const auto &mul = instr.mul;
 
 	UNPREDICTABLE(mul.rd == PC || mul.rm == PC || mul.rs == PC,
 	              "arm_mul: Rd/Rm or Rs must not be PC.");
@@ -437,7 +421,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mul() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_mla() {
-	constexpr const auto &mul = std::get<isa::arm::Multiply>(instr.group);
+	constexpr const auto &mul = instr.mul;
 
 	UNPREDICTABLE(mul.rd == PC || mul.rm == PC || mul.rs == PC,
 	              "arm_mla: Rd/Rm or Rs must not be PC.");
@@ -458,7 +442,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mla() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_mull() {
-	constexpr const auto &mull = std::get<isa::arm::MultiplyLong>(instr.group);
+	constexpr const auto &mull = instr.mull;
 
 	UNPREDICTABLE(mull.rd_lo == PC || mull.rd_hi == PC || mull.rm == PC ||
 	                  mull.rs == PC,
@@ -489,7 +473,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mull() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_mlal() {
-	constexpr const auto &mull = std::get<isa::arm::MultiplyLong>(instr.group);
+	constexpr const auto &mull = instr.mull;
 
 	UNPREDICTABLE(mull.rd_lo == PC || mull.rd_hi == PC || mull.rm == PC ||
 	                  mull.rs == PC,
@@ -522,8 +506,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_mlal() {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_ldr(Memory &memory) {
-	constexpr const auto &data_trans =
-	    std::get<isa::arm::DataTransfer>(instr.group);
+	constexpr const auto &data_trans = instr.data_trans;
 
 	UNPREDICTABLE((data_trans.w || data_trans.p) && r[data_trans.rn] == PC,
 	              "Writeback with PC as Rn.")
@@ -551,8 +534,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_ldr(Memory &memory) {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_str(Memory &memory) {
-	constexpr const auto &data_trans =
-	    std::get<isa::arm::DataTransfer>(instr.group);
+	constexpr const auto &data_trans = instr.data_trans;
 
 	UNPREDICTABLE((data_trans.w || data_trans.p) && r[data_trans.rn] == PC,
 	              "Writeback with PC as Rn.")
@@ -587,8 +569,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_str(Memory &memory) {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_ldrh(Memory &memory) {
-	constexpr const auto &hw_data_trans =
-	    std::get<isa::arm::HalfWordDataTransfer>(instr.group);
+	constexpr const auto &hw_data_trans = instr.hw_data_trans;
 
 	UNPREDICTABLE((hw_data_trans.w || hw_data_trans.p) &&
 	                  r[hw_data_trans.rn] == PC,
@@ -638,8 +619,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_ldrh(Memory &memory) {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_strh(Memory &memory) {
-	constexpr const auto &hw_data_trans =
-	    std::get<isa::arm::HalfWordDataTransfer>(instr.group);
+	constexpr const auto &hw_data_trans = instr.hw_data_trans;
 
 	UNPREDICTABLE((hw_data_trans.w || hw_data_trans.p) &&
 	                  r[hw_data_trans.rn] == PC,
@@ -686,8 +666,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_strh(Memory &memory) {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_ldm(Memory &memory) {
-	constexpr const auto &blk_data_trans =
-	    std::get<isa::arm::BlockDataTransfer>(instr.group);
+	constexpr const auto &blk_data_trans = instr.blk_data_trans;
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 
@@ -721,8 +700,7 @@ template <CPUState::CRefInstr instr> void CPUState::arm_ldm(Memory &memory) {
 }
 
 template <CPUState::CRefInstr instr> void CPUState::arm_stm(Memory &memory) {
-	constexpr const auto &blk_data_trans =
-	    std::get<isa::arm::BlockDataTransfer>(instr.group);
+	constexpr const auto &blk_data_trans = instr.blk_data_trans;
 
 	LAYER_DBE_NEXT(*this, "%s: before", __func__);
 

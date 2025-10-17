@@ -1,4 +1,4 @@
-project('output', 'cpp', default_options: ['b_lto=true'])
+project('output', 'cpp', default_options: ['b_lto=true', 'cpp_std=c++20'])
 charm_proj = subproject('charm', default_options: ['runtime_only=true'])
 
 add_project_arguments('-Wno-unused-label', language: 'cpp')

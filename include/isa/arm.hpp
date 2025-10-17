@@ -6,7 +6,6 @@
 #include <arch.hpp>
 #include <cstdint>
 #include <string>
-#include <variant>
 
 namespace charm::isa::arm {
 
@@ -210,10 +209,22 @@ struct Instruction {
 	bool is_imm = false;     // is operand imm or reg?
 	bool set_cflags = false; // will set condition flags?
 
-	std::variant<DataProcessing, Multiply, MultiplyLong, DataTransfer,
-	             HalfWordDataTransfer, BlockDataTransfer, DataSwap, Branch,
-	             BranchEx, SWI, Invalid>
-	    group = Invalid{};
+	// this was std::variant, however std::variant is not of literal type...
+	// Since we use compile-time evaulation, changed to regular union instead.
+	union {
+		DataProcessing data;
+		Multiply mul;
+		MultiplyLong mull;
+		DataTransfer data_trans;
+		HalfWordDataTransfer hw_data_trans;
+		BlockDataTransfer blk_data_trans;
+		DataSwap data_swap;
+		Branch branch;
+		BranchEx branchex;
+		SWI swi;
+		Invalid invalid = {};
+	};
+	InstructionGroup group = InstructionGroup::INVALID;
 
 	std::string dump() const;
 };
