@@ -25,7 +25,7 @@ var_color_a         .req    r9
 
 .equ QOI_MASK2,         0xc0
 .equ QOI_OP_RGB,        0xfe
-.equ QOI_OP_RGBA,       0xfe
+.equ QOI_OP_RGBA,       0xff
 .equ QOI_OP_INDEX,      0x00
 .equ QOI_OP_DIFF,       0x40
 .equ QOI_OP_LUMA,       0x80
